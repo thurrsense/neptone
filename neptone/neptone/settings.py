@@ -76,10 +76,19 @@ WSGI_APPLICATION = 'neptone.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+DATABASE_NAME = os.getenv('DATABASE_NAME')
+
+DATABASE_USER = os.getenv('DATABASE_USER')
+DATABASE_PASSWORD = os.getenv('DATABASE_PASSWORD')
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': DATABASE_NAME,
+        'USER': DATABASE_USER,
+        'PASSWORD': DATABASE_PASSWORD,
+        'HOST': 'localhost',
+        'PORT': '',
     }
 }
 
