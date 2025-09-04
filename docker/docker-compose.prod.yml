@@ -15,7 +15,7 @@ services:
       retries: 5
 
   web:
-    image: ghcr.io/OWNER/REPO:latest
+    image: ghcr.io/thurrsense/neptone:latest
     restart: always
     environment:
       DJANGO_DEBUG: "0"
