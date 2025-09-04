@@ -1,0 +1,51 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${DB_NAME:-neptone}
+      POSTGRES_USER: ${DB_USER:-neptone}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-neptone_pwd}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-secret}
+      DJANGO_ALLOWED_HOSTS: "127.0.0.1,localhost"
+      CSRF_TRUSTED_ORIGINS: "http://127.0.0.1:8000,http://localhost:8000"
+
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-neptone}
+      DB_USER: ${DB_USER:-neptone}
+      DB_PASSWORD: ${DB_PASSWORD:-neptone_pwd}
+
+      # на будущее (S3/Redis и т.п.)
+      DJANGO_COLLECTSTATIC: "0"
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../neptone:/app/neptone:delegated  # hot-reload кода в dev
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+      
+volumes:
+  db_data:

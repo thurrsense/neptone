@@ -1,0 +1,49 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="auth-container">
+  <div class="auth-card">
+    <!-- Логотип -->
+    <img src="{% static 'images/logo.svg' %}" alt="Logo" class="auth-logo">
+    
+    <!-- Форма регистрации -->
+    <form method="post" class="auth-form">
+      {% csrf_token %}
+      
+      <div class="form-group">
+        <label for="{{ form.username.id_for_label }}">Username</label>
+        {{ form.username }}
+        {% if form.username.errors %}
+          <div class="error">{{ form.username.errors }}</div>
+        {% endif %}
+      </div>
+      
+      <div class="form-group">
+        <label>Password (1-0, Aa)</label>
+        {{ form.password1 }}
+      </div>
+      
+      <div class="form-group">
+        <label>Confirm Password</label>
+        {{ form.password2 }}
+      </div>
+      
+      <button type="submit" class="btn-primary">
+        <span>Continue</span>
+      </button>
+    </form>
+    
+    <!-- Разделитель -->
+    <div class="auth-divider">
+      <span>or</span>
+    </div>
+    
+    <!-- Ссылки -->
+    <div class="auth-links">
+      <a href="{% url 'login' %}" class="text-link">Forgot your password?</a>
+      <a href="{% url 'login' %}" class="text-link">You don't have an account? Sign up</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
