@@ -1,11 +1,10 @@
 name: Build & Deploy
-
 on:
   pull_request:
     branches: [ "dev" ]        # PR в dev — соберём образ (проверка)
   push:
     branches: [ "main" ]       # пуш в main — сборка + деплой
-
+    
 jobs:
   build:
     runs-on: ubuntu-latest
