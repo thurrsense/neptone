@@ -81,19 +81,12 @@ jobs:
             sed -i 's/\r$//' docker-compose.prod.yml || true
             sed -i 's/\t/  /g' docker-compose.prod.yml || true
 
-            # 3) подменим image в сервисе web на актуальный тег
-            awk -v IMG="$IMAGE" '
-              BEGIN{inweb=0}
-              /^[[:space:]]*web:/{inweb=1}
-              /^[[:space:]]*[a-z0-9_-]+:/{if($0 !~ /^[[:space:]]*web:/) inweb=0}
-              {
-                if(inweb==1 && $0 ~ /^[[:space:]]*image:/){ sub(/image:.*/,"image: " IMG) }
-                print
-              }
-            ' docker-compose.prod.yml > docker-compose.prod.yml.tmp && mv docker-compose.prod.yml.tmp docker-compose.prod.yml
+            # 3) на всякий случай зачистим BOM/CRLF/табы в compose (безопасно)
+            sed -i '1s/^\xEF\xBB\xBF//' docker-compose.prod.yml || true
+            sed -i 's/\r$//' docker-compose.prod.yml || true
+            sed -i 's/\t/  /g' docker-compose.prod.yml || true
 
-            # 4) валидация YAML перед запуском
-            echo "---- docker compose config (validation) ----"
+            # 4) валидация yaml c подставленными переменными
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             docker compose --env-file .env -f docker-compose.prod.yml config
 
