@@ -1,9 +1,196 @@
-from django.shortcuts import redirect, render
-from django.contrib.auth.decorators import login_required
-from .forms import ProfileForm, RegistrationForm
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.renderers import JSONRenderer
+from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import login
+from captcha.models import CaptchaStore
+from captcha.helpers import captcha_image_url
+from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
+from .models import User
+from rest_framework.permissions import IsAuthenticated  
+from django_otp.plugins.otp_totp.models import TOTPDevice
+from django_otp import login as otp_login
+from .serializers import TOTPSetupSerializer, TOTPVerifySerializer, TOTPLoginSerializer
 
 
+class TOTPSetupView(APIView):
+    """Настройка 2FA"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        if request.user.otp_enabled:
+            return Response({'error': '2FA уже включена'}, status=400)
+        
+        serializer = TOTPSetupSerializer(
+            data={}, 
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+        
+        return Response(result)
+
+class TOTPVerifyView(APIView):
+    """Верификация 2FA"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        serializer = TOTPVerifySerializer(
+            data=request.data, 
+            context={'request': request}
+        )
+        
+        if serializer.is_valid():
+            return Response({'success': '2FA успешно включена'})
+        return Response(serializer.errors, status=400)
+
+class TOTPLoginView(APIView):
+    """Логин с 2FA"""
+    
+    def post(self, request):
+        # Сначала обычная аутентификация
+        auth_serializer = LoginSerializer(data=request.data)
+        if not auth_serializer.is_valid():
+            return Response(auth_serializer.errors, status=400)
+        
+        user = auth_serializer.validated_data['user']
+        
+        # Если у пользователя включена 2FA
+        if user.otp_enabled:
+            # Проверяем OTP токен
+            otp_serializer = TOTPLoginSerializer(
+                data=request.data,
+                context={'request': request, 'user': user}
+            )
+            
+            if otp_serializer.is_valid():
+                # Генерируем JWT токены
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    'user': UserSerializer(user).data,
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token),
+                })
+            else:
+                return Response(otp_serializer.errors, status=400)
+        else:
+            # Обычный логин без 2FA
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'user': UserSerializer(user).data,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            })
+
+class CaptchaGenerateView(APIView):
+    renderer_classes = [JSONRenderer]
+    
+    def get(self, request):
+        key = CaptchaStore.generate_key()
+        image_url = captcha_image_url(key)
+        
+        # Для отладки - посмотрим что генерируется
+        captcha = CaptchaStore.objects.get(hashkey=key)
+        print(f"DEBUG: Generated captcha - Key: {key}, Response: {captcha.response}")
+        
+        return Response({
+            'key': key,
+            'image_url': request.build_absolute_uri(image_url),
+            'debug_response': captcha.response  # Убрать в продакшене!
+        })
+
+class CaptchaVerifyView(APIView):  # ДОБАВЬТЕ ЭТОТ КЛАСС
+    renderer_classes = [JSONRenderer]
+    
+    def post(self, request):
+        key = request.data.get('key')
+        response = request.data.get('response')
+        
+        try:
+            captcha = CaptchaStore.objects.get(hashkey=key)
+            print(f"DEBUG: Expected captcha: {captcha.response}, Got: {response}")
+            
+            # Сравниваем без учета регистра
+            if captcha.response.lower() != response.lower():
+                return Response({'valid': False}, status=status.HTTP_400_BAD_REQUEST)
+            
+            captcha.delete()
+            return Response({'valid': True})
+            
+        except CaptchaStore.DoesNotExist:
+            return Response({'error': 'Invalid key'}, status=status.HTTP_400_BAD_REQUEST)
+
+class RegisterAPIView(APIView):
+    renderer_classes = [JSONRenderer]
+    
+    def post(self, request):
+        print(f"DEBUG: Request data: {request.data}")
+        
+        # Сначала проверяем капчу
+        captcha_key = request.data.get('captcha_key')
+        captcha_response = request.data.get('captcha_response')
+        
+        if not captcha_key or not captcha_response:
+            return Response(
+                {'error': 'Капча обязательна'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            captcha = CaptchaStore.objects.get(hashkey=captcha_key)
+            if captcha.response.lower() != captcha_response.lower():
+                return Response(
+                    {'error': 'Неверная капча'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            captcha.delete()
+        except CaptchaStore.DoesNotExist:
+            return Response(
+                {'error': 'Неверный ключ капчи'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Теперь валидируем остальные данные
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'user': UserSerializer(user).data,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }, status=status.HTTP_201_CREATED)
+        
+        print(f"DEBUG: Validation errors: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LoginAPIView(APIView):
+    renderer_classes = [JSONRenderer]
+    
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.validated_data['user']
+            refresh = RefreshToken.for_user(user)
+            
+            # Опционально: логиним пользователя в сессии
+            login(request, user)
+            
+            return Response({
+                'user': UserSerializer(user).data,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Старые view для совместимости
 def register(request):
+    from django.shortcuts import redirect, render
+    from .forms import RegistrationForm
+    from django.contrib.auth import login
+    
     if request.method == 'POST':
         form = RegistrationForm(request.POST)
         if form.is_valid():
@@ -14,8 +201,11 @@ def register(request):
         form = RegistrationForm()
     return render(request, 'users/register.html', {'form': form})
 
-@login_required
 def edit_profile(request):
+    from django.shortcuts import redirect, render
+    from django.contrib.auth.decorators import login_required
+    from .forms import ProfileForm
+    
     if request.method == 'POST':
         form = ProfileForm(request.POST, instance=request.user)
         if form.is_valid():
@@ -24,4 +214,3 @@ def edit_profile(request):
     else:
         form = ProfileForm(instance=request.user)
     return render(request, 'users/edit_profile.html', {'form': form})
-

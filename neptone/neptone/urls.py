@@ -16,9 +16,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-
+from users.views import CaptchaGenerateView, CaptchaVerifyView  
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/captcha/generate/', CaptchaGenerateView.as_view(), name='captcha-generate'),
+    path('api/captcha/verify/', CaptchaVerifyView.as_view(), name='captcha-verify'),
+    path('api/captcha/', include('captcha.urls')),
     path('users/', include('users.urls')),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/', include('djoser.urls')),
     path('', include('core.urls')),
 ]
