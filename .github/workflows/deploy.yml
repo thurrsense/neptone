@@ -56,7 +56,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           source: "docker/docker-compose.prod.yml"
-          target: "~/neptone/docker/"
+          target: "/root/neptone/docker/"
 
       - name: Deploy over SSH (pull & up)
         uses: appleboy/ssh-action@v1.2.0
@@ -69,11 +69,11 @@ jobs:
           script_stop: true
           script: |
             set -e
-            cd ~/neptone/docker
+            cd /root/neptone/docker
 
-            # 1) .env из секрета
             cat > .env <<'ENVV'
             ${{ secrets.ENV_PROD }}
+            IMAGE=${{ steps.meta.outputs.IMAGE }}
             ENVV
 
             # 2) зачистка compose (BOM/CRLF/табов)
