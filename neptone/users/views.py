@@ -14,6 +14,7 @@ def register(request):
         form = RegistrationForm()
     return render(request, 'users/register.html', {'form': form})
 
+
 @login_required
 def edit_profile(request):
     if request.method == 'POST':
@@ -24,4 +25,3 @@ def edit_profile(request):
     else:
         form = ProfileForm(instance=request.user)
     return render(request, 'users/edit_profile.html', {'form': form})
-
