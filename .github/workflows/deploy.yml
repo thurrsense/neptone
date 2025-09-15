@@ -69,7 +69,7 @@ jobs:
           script_stop: true
           script: |
             set -e
-            cd ~/neptone/docker
+            cd /root/neptone/docker
 
             # 1) .env из секрета
             cat > .env <<'ENVV'
