@@ -71,9 +71,9 @@ jobs:
             set -e
             cd /root/neptone/docker
 
-            # 1) .env из секрета
             cat > .env <<'ENVV'
             ${{ secrets.ENV_PROD }}
+            IMAGE=${{ steps.meta.outputs.IMAGE }}
             ENVV
 
             # 2) зачистка compose (BOM/CRLF/табов)
