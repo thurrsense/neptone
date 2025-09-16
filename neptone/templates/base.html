@@ -5,6 +5,30 @@
 <head>
     <meta charset="utf-8">
     <title>{% block title %}NEPTONE{% endblock %}</title>
+    <nav class="navbar navbar-light bg-white border-bottom mb-3">
+        <div class="container d-flex align-items-center justify-content-between">
+            <a class="navbar-brand fw-bold" href="{% url 'home' %}">NEPTONE</a>
+
+            <form class="d-none d-md-block" action="{% url 'home' %}" method="get" style="min-width:320px;">
+                <input name="q" class="form-control" placeholder="Search">
+            </form>
+
+            <div class="d-flex align-items-center gap-2">
+                {% if user.is_authenticated %}
+                <a class="btn btn-sm btn-dark" href="{% url 'settings_profile' %}#upload">Upload</a>
+                <a class="btn btn-sm btn-outline-dark" href="{% url 'my_profile' %}">My profile</a>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'settings_profile' %}">Settings</a>
+                <form method="post" action="{% url 'logout' %}" class="d-inline">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-secondary">Logout</button>
+                </form>
+                {% else %}
+                <a class="btn btn-sm btn-dark" href="{% url 'login' %}">Login</a>
+                <a class="btn btn-sm btn-outline-dark" href="{% url 'register' %}">Sign up</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
 
     <!-- favicon -->
     <link rel="icon" href="{% static 'images/favicon.svg' %}" type="image/svg+xml">

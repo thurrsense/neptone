@@ -3,73 +3,70 @@
 {% block title %}{{ artist.username }} · NEPTONE{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center g-4">
-    <div class="col-12 col-lg-10">
+<div class="container-fluid px-0">
 
-        <!-- Шапка артиста -->
-        <div class="card border-0 shadow-sm rounded-4 p-4 mb-3">
-            <div class="d-flex align-items-center gap-3">
-                {% if artist.avatar %}
-                <img src="{{ artist.avatar.url }}" class="rounded-circle"
-                    style="width:96px;height:96px;object-fit:cover;">
-                {% else %}
-                <div class="rounded-circle bg-secondary d-inline-flex align-items-center justify-content-center"
-                    style="width:96px;height:96px;color:#fff;">{{ artist.username|first|upper }}</div>
-                {% endif %}
-                <div class="flex-grow-1">
-                    <h1 class="h4 mb-1">{{ artist.get_full_name|default:artist.username }}</h1>
-                    {% if artist.bio %}<div class="text-muted">{{ artist.bio }}</div>{% endif %}
-                </div>
-                {% if is_owner %}
-                <a class="btn btn-outline-dark" href="{% url 'settings_profile' %}">Мои настройки</a>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Публичные треки -->
-        <div class="card border rounded-4 p-4">
-            <h2 class="h5 mb-3">Публичные треки</h2>
-
-            {% if page_obj and page_obj.object_list %}
-            <div class="vstack gap-3">
-                {% for t in page_obj.object_list %}
-                <div class="card border rounded-4 p-3">
-                    <div class="fw-medium mb-1">{{ t.title }}</div>
-                    {% if t.cover %}
-                    <img src="{{ t.cover.url }}" alt="" class="mb-2" style="max-width:100%;height:auto;">
-                    {% endif %}
-                    <audio controls style="width:100%;">
-                        <source src="{{ t.audio.url }}" type="audio/mpeg">
-                        <source src="{{ t.audio.url }}" type="audio/wav">
-                        <source src="{{ t.audio.url }}" type="audio/ogg">
-                        Ваш браузер не поддерживает воспроизведение аудио.
-                    </audio>
-                    <div class="text-muted small mt-1">{{ t.created_at|date:"Y-m-d H:i" }}</div>
-                </div>
-                {% endfor %}
-            </div>
-
-            {% if page_obj.paginator.num_pages > 1 %}
-            <nav class="mt-3">
-                <ul class="pagination mb-0">
-                    {% if page_obj.has_previous %}
-                    <li class="page-item"><a class="page-link"
-                            href="?page={{ page_obj.previous_page_number }}">Назад</a></li>
-                    {% endif %}
-                    <li class="page-item disabled"><span class="page-link">Стр. {{ page_obj.number }} из {{
-                            page_obj.paginator.num_pages }}</span></li>
-                    {% if page_obj.has_next %}
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Вперёд</a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-            {% endif %}
+    <!-- Верхний блок профиля -->
+    <div class="position-relative" style="height: 250px; background: #222;">
+        {% if artist.cover %}
+        <img src="{{ artist.cover.url }}" class="w-100 h-100 object-fit-cover" style="object-fit: cover;">
+        {% else %}
+        <div class="w-100 h-100 bg-dark"></div>
+        {% endif %}
+        <div class="position-absolute bottom-0 start-0 d-flex align-items-end p-3 text-white">
+            {% if artist.avatar %}
+            <img src="{{ artist.avatar.url }}" class="rounded-circle me-3"
+                style="width:120px;height:120px;object-fit:cover;border:4px solid white;">
             {% else %}
-            <p class="text-muted mb-0">Публичных треков пока нет.</p>
+            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3"
+                style="width:120px;height:120px;border:4px solid white;">
+                {{ artist.username|first|upper }}
+            </div>
             {% endif %}
+            <div>
+                <h2 class="mb-0">{{ artist.username }}</h2>
+                <p class="mb-1 text-muted">{{ artist.bio|default:"Музыкант на NEPTONE" }}</p>
+                {% if user == artist %}
+                <a href="{% url 'edit_profile' %}" class="btn btn-light btn-sm">Редактировать</a>
+                {% endif %}
+            </div>
         </div>
-
     </div>
+
+    <!-- Меню -->
+    <div class="border-bottom bg-white px-3">
+        <ul class="nav nav-tabs">
+            <li class="nav-item"><a class="nav-link active" href="#">Все треки</a></li>
+            <li class="nav-item"><a class="nav-link disabled">Альбомы</a></li>
+            <li class="nav-item"><a class="nav-link disabled">Плейлисты</a></li>
+        </ul>
+    </div>
+
+    <!-- Лента треков -->
+    <div class="container my-4">
+        {% if tracks %}
+        <div class="vstack gap-3">
+            {% for t in tracks %}
+            <div class="card p-3">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    {% if t.cover %}
+                    <img src="{{ t.cover.url }}" style="width:60px;height:60px;object-fit:cover;" class="rounded">
+                    {% endif %}
+                    <div>
+                        <h5 class="mb-0">{{ t.title }}</h5>
+                        <small class="text-muted">{{ t.created_at|date:"Y-m-d H:i" }}</small>
+                    </div>
+                </div>
+                <audio controls style="width:100%;">
+                    <source src="{{ t.audio.url }}" type="audio/mpeg">
+                    Ваш браузер не поддерживает аудио.
+                </audio>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">Этот артист пока ничего не загрузил.</p>
+        {% endif %}
+    </div>
+
 </div>
 {% endblock %}
