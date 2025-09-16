@@ -2,9 +2,9 @@ name: Build & Deploy
 
 on:
   pull_request:
-    branches: ["dev"]        # PR в dev — проверочная сборка (без пуша)
+    branches: ["dev"]
   push:
-    branches: ["main"]       # пуш в main — сборка + деплой
+    branches: ["main"]
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -17,12 +17,13 @@ jobs:
       contents: read
       packages: write
     outputs:
-      IMAGE: ${{ steps.meta.outputs.IMAGE }}   # <<< ВАЖНО: пробрасываем IMAGE наружу
+      IMAGE: ${{ steps.meta.outputs.IMAGE }}
     steps:
       - uses: actions/checkout@v4
 
+      # Нужен, чтобы не упираться в лимиты Docker Hub при pull базовых образов
       - name: Login to Docker Hub
-        if: always()
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -60,7 +61,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
@@ -68,22 +68,63 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Upload compose & nginx.conf via SCP
+      # 1) Сформировать бандл с корректными путями, где бы файлы ни лежали в репо
+      - name: Prepare deploy bundle
+        run: |
+          set -euo pipefail
+          rm -rf deploy_bundle
+          mkdir -p deploy_bundle/nginx
+
+          # docker-compose.prod.yml: ищем сначала в корне, потом в docker/
+          if [ -f "docker-compose.prod.yml" ]; then
+            cp "docker-compose.prod.yml" "deploy_bundle/docker-compose.prod.yml"
+          elif [ -f "docker/docker-compose.prod.yml" ]; then
+            cp "docker/docker-compose.prod.yml" "deploy_bundle/docker-compose.prod.yml"
+          else
+            echo "ERROR: docker-compose.prod.yml not found in repo root or docker/"; exit 1
+          fi
+
+          # nginx.conf: ищем в nginx/ и в docker/nginx/
+          if [ -f "nginx/nginx.conf" ]; then
+            cp "nginx/nginx.conf" "deploy_bundle/nginx/nginx.conf"
+          elif [ -f "docker/nginx/nginx.conf" ]; then
+            mkdir -p deploy_bundle/nginx
+            cp "docker/nginx/nginx.conf" "deploy_bundle/nginx/nginx.conf"
+          else
+            echo "WARNING: nginx/nginx.conf not found; will rely on remote existing file"
+          fi
+
+          echo "== bundle tree =="
+          find deploy_bundle -maxdepth 3 -type f -print
+
+      # 2) Создать директории на сервере
+      - name: Ensure remote dirs
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            mkdir -p /root/neptone/docker/nginx
+
+      # 3) Скопировать бандл
+      - name: Upload deploy bundle via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: |
-            docker/docker-compose.prod.yml
-            docker/nginx/nginx.conf
-          target: /root/neptone/docker/
-          strip_components: 1
+          source: "deploy_bundle/*"
+          target: "/root/neptone/docker/"
+          rm: true
 
+      # 4) Деплой
       - name: Deploy over SSH (pull & up)
         uses: appleboy/ssh-action@v1.2.0
         env:
-          IMAGE: ${{ needs.build.outputs.IMAGE }}   # <<< теперь не пусто
+          IMAGE: ${{ needs.build.outputs.IMAGE }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -101,13 +142,13 @@ jobs:
             IMAGE=${{ env.IMAGE }}
             ENVV
 
-            # Проверим, что IMAGE подставился
             if ! grep -qE '^IMAGE=.+$' .env; then
               echo "ERROR: IMAGE is empty in .env"; cat .env; exit 1
             fi
 
-            # Немного диагностики
+            # Диагностика
             ls -la
+            [ -f nginx/nginx.conf ] && echo "nginx.conf present" || echo "nginx.conf MISSING"
             sha256sum docker-compose.prod.yml || true
 
             # Нормализация и валидация
@@ -115,14 +156,13 @@ jobs:
             sed -i 's/\r$//' docker-compose.prod.yml || true
             sed -i 's/\t/  /g' docker-compose.prod.yml || true
 
-            # Логин в GHCR (ваш образ)
+            # Логины (GHCR обязателен, Hub — если даны секреты)
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-            # (опционально) логин в Docker Hub — для postgres/nginx
-            if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
-              echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+              echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin || true
             fi
 
-            # Посмотреть, какой итоговый config видит compose (должен быть image: ghcr.io/... )
+            # Проверка итоговой конфигурации (web.image должен быть ghcr.io/...)
             docker compose --env-file .env -f docker-compose.prod.yml config | sed -n '/services:/,$p'
 
             # Обновление и запуск
