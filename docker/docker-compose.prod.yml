@@ -19,11 +19,12 @@ services:
     restart: always
     env_file: .env
     environment:
-      # ВАЖНО: эти переменные нужны Django, а не postgres
       DB_HOST: db
       DB_PORT: 5432
       STATIC_ROOT: /app/staticfiles
       MEDIA_ROOT: /app/media
+      # дефолты для gunicorn, чтобы точно слушал на всех интерфейсах
+      GUNICORN_CMD_ARGS: "--bind 0.0.0.0:8000 --workers 3 --threads 2 --timeout 60 --access-logfile - --error-logfile -"
     depends_on:
       db:
         condition: service_healthy
@@ -32,11 +33,7 @@ services:
       - "8000"
     command: >
       sh -exc '
-        python manage.py migrate --noinput &&
-        python manage.py collectstatic --noinput &&
         exec gunicorn neptone.wsgi:application
-          --bind 0.0.0.0:8000
-          --workers 3 --threads 2 --timeout 60
       '
     volumes:
       - web_static:/app/staticfiles
