@@ -214,13 +214,17 @@ def register(request):
 
 
 @login_required
-def edit_profile(request):
+def profile(request):
+    return render(request, "users/profile.html", {"user_obj": request.user})
 
-    if request.method == 'POST':
-        form = ProfileForm(request.POST, instance=request.user)
+
+@login_required
+def edit_profile(request):
+    if request.method == "POST":
+        form = ProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
-            return redirect('profile')
+            return redirect("profile")
     else:
         form = ProfileForm(instance=request.user)
-    return render(request, 'users/edit_profile.html', {'form': form})
+    return render(request, "users/profile_edit.html", {"form": form})

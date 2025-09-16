@@ -5,15 +5,14 @@ services:
       POSTGRES_DB: ${DB_NAME:-neptone}
       POSTGRES_USER: ${DB_USER:-neptone}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-neptone_pwd}
-    ports:
-      - "5432:5432"
+    ports: ["5432:5432"]
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
-
+      retries: 5
 
   web:
     build:
@@ -31,14 +30,16 @@ services:
       DB_USER: ${DB_USER:-neptone}
       DB_PASSWORD: ${DB_PASSWORD:-neptone_pwd}
 
-      # на будущее (S3/Redis и т.п.)
       DJANGO_COLLECTSTATIC: "0"
     depends_on:
-      - db
-    ports:
-      - "8000:8000"
+      db:
+        condition: service_healthy
+    ports: ["8000:8000"]
     volumes:
-      - ../neptone:/app/neptone:delegated  # hot-reload кода в dev
+      - ../neptone:/app/neptone:delegated   # hot reload
+    working_dir: /app/neptone               # <— ВАЖНО
+    # если в Dockerfile НЕТ команды runserver — раскомментируй:
+    # command: python manage.py runserver 0.0.0.0:8000
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
       interval: 15s
