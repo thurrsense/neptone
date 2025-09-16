@@ -21,6 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Docker Hub login (чтобы не упираться в rate limit) — только на push
       - name: Login to Docker Hub
         if: ${{ github.event_name == 'push' }}
         continue-on-error: true
@@ -68,12 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 0) На всякий случай: положим обновлённый compose в корень репо тоже
-      - name: Ensure flattened compose in repo root (optional)
-        run: |
-          cp docker/docker-compose.prod.yml docker-compose.prod.yml
-
-      # 1) Подготовить место на сервере и удалить кривые остатки
+      # Подготовить каталог на сервере и удалить кривые хвосты
       - name: Prepare remote dir (cleanup)
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -84,13 +80,12 @@ jobs:
           script: |
             set -e
             mkdir -p /root/neptone/docker
-            # удалить папку/файл, если вдруг есть с именем compose
+            # на всякий случай, если когда-то создавалась ПАПКА с таким именем
             [ -d /root/neptone/docker/docker-compose.prod.yml ] && rm -rf /root/neptone/docker/docker-compose.prod.yml || true
-            [ -f /root/neptone/docker/docker-compose.prod.yml ] && rm -f /root/neptone/docker/docker-compose.prod.yml || true
-            # удалить старую папку nginx, раз теперь файл лежит в корне
-            [ -d /root/neptone/docker/nginx ] && rm -rf /root/neptone/docker/nginx || true
+            [ -f /root/neptone/docker/docker-compose.prod.yml ] && rm -f  /root/neptone/docker/docker-compose.prod.yml || true
+            [ -d /root/neptone/docker/nginx.conf ] && rm -rf /root/neptone/docker/nginx.conf || true
 
-      # 2) Копируем ОБА файла прямо в /root/neptone/docker/
+      # Копируем файлы ровно в /root/neptone/docker/
       - name: Upload compose via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -99,7 +94,6 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           source: "docker/docker-compose.prod.yml"
           target: "/root/neptone/docker/"
-          strip_components: 1
           overwrite: true
 
       - name: Upload nginx.conf via SCP
@@ -110,27 +104,10 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           source: "docker/nginx.conf"
           target: "/root/neptone/docker/"
-          strip_components: 1
           overwrite: true
 
-      # 3) Проверка на сервере, что оба файла лежат в КОРНЕ
-      - name: Verify files on server
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script_stop: true
-          script: |
-            set -e
-            cd /root/neptone/docker
-            echo "== listing =="
-            ls -la
-            [ -f docker-compose.prod.yml ] || (echo "docker-compose.prod.yml MISSING"; exit 1)
-            [ -f nginx.conf ] || (echo "nginx.conf MISSING"; exit 1)
-
-      # 4) Деплой
-      - name: Deploy over SSH (pull & up)
+      # Деплой
+      - name: Deploy over SSH (pull, migrate, collectstatic, up)
         uses: appleboy/ssh-action@v1.2.0
         env:
           IMAGE: ${{ needs.build.outputs.IMAGE }}
@@ -144,34 +121,46 @@ jobs:
             set -euo pipefail
             cd /root/neptone/docker
 
-            echo "== IMAGE from CI =="
-            echo "$IMAGE"
-
-            # .env для compose
+            # .env из секрета + IMAGE
             cat > .env <<ENVV
             ${{ secrets.ENV_PROD }}
             IMAGE=$IMAGE
             ENVV
 
-            # Нормализация и валидация
+            # sanity-check
+            [ -f docker-compose.prod.yml ] || (echo "docker-compose.prod.yml MISSING"; exit 1)
+            [ -f nginx.conf ] || (echo "nginx.conf MISSING"; exit 1)
+            grep -qE '^IMAGE=.+$' .env || (echo "IMAGE missing in .env"; exit 1)
+
+            # нормализация (на всякий случай)
             sed -i '1s/^\xEF\xBB\xBF//' docker-compose.prod.yml || true
             sed -i 's/\r$//' docker-compose.prod.yml || true
             sed -i 's/\t/  /g' docker-compose.prod.yml || true
 
-            # Логины
+            # логины
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
               echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin || true
             fi
 
-            # Проверка финальной конфигурации (у web должен быть image: ghcr.io/…)
-            docker compose --env-file .env -f docker-compose.prod.yml config | sed -n '/services:/,$p'
-
+            # подтянуть образы и поднять БД
             docker compose --env-file .env -f docker-compose.prod.yml pull
-            docker compose --env-file .env -f docker-compose.prod.yml up -d
+            docker compose --env-file .env -f docker-compose.prod.yml up -d db
 
-            # Check static
-            docker compose --env-file .env -f docker-compose.prod.yml exec -T nginx \
-              sh -lc 'ls -1 /app/staticfiles | head -n 5'
+            # дождаться готовности БД
+            for i in $(seq 1 30); do
+              docker compose -f docker-compose.prod.yml exec -T db bash -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' && break || sleep 2
+            done
 
+            # миграции и статика одноразово (без гонок старта web)
+            docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps web python manage.py migrate --noinput
+            docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps web python manage.py collectstatic --noinput
+
+            # запуск web и nginx
+            docker compose --env-file .env -f docker-compose.prod.yml up -d web nginx
+
+            # быстрая проверка upstream
+            docker compose exec -T nginx sh -lc 'apk add -q busybox-extras curl || true; nc -zv web 8000; curl -sI http://web:8000/ | head -n1'
+
+            # лёгкая уборка
             docker system prune -f
