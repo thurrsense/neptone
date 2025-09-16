@@ -2,9 +2,9 @@ name: Build & Deploy
 
 on:
   pull_request:
-    branches: ["dev"]
+    branches: ["dev"]        # PR в dev — проверочная сборка (без пуша)
   push:
-    branches: ["main"]
+    branches: ["main"]       # пуш в main — сборка + деплой
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -17,13 +17,15 @@ jobs:
       contents: read
       packages: write
     outputs:
-      IMAGE: ${{ steps.meta.outputs.IMAGE }}
+      IMAGE: ${{ steps.meta.outputs.IMAGE }}     # пробрасываем IMAGE в deploy
     steps:
       - uses: actions/checkout@v4
 
-      # Нужен, чтобы не упираться в лимиты Docker Hub при pull базовых образов
+      # Логин в Docker Hub: только на push (на PR секреты недоступны).
+      # continue-on-error, чтобы не уронить билд, если секретов нет.
       - name: Login to Docker Hub
-        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        if: ${{ github.event_name == 'push' }}
+        continue-on-error: true
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -36,6 +38,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Buildx с драйвером docker-container, чтобы работал GHA cache
       - name: Set up Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
@@ -68,14 +71,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1) Сформировать бандл с корректными путями, где бы файлы ни лежали в репо
+      # 1) Готовим бандл для копирования (исключаем пустые источники = больше не будет "tar: empty archive")
       - name: Prepare deploy bundle
         run: |
           set -euo pipefail
           rm -rf deploy_bundle
           mkdir -p deploy_bundle/nginx
 
-          # docker-compose.prod.yml: ищем сначала в корне, потом в docker/
+          # docker-compose.prod.yml: ищем в корне, затем в docker/
           if [ -f "docker-compose.prod.yml" ]; then
             cp "docker-compose.prod.yml" "deploy_bundle/docker-compose.prod.yml"
           elif [ -f "docker/docker-compose.prod.yml" ]; then
@@ -84,20 +87,19 @@ jobs:
             echo "ERROR: docker-compose.prod.yml not found in repo root or docker/"; exit 1
           fi
 
-          # nginx.conf: ищем в nginx/ и в docker/nginx/
+          # nginx.conf: ищем в nginx/ и docker/nginx/
           if [ -f "nginx/nginx.conf" ]; then
             cp "nginx/nginx.conf" "deploy_bundle/nginx/nginx.conf"
           elif [ -f "docker/nginx/nginx.conf" ]; then
-            mkdir -p deploy_bundle/nginx
             cp "docker/nginx/nginx.conf" "deploy_bundle/nginx/nginx.conf"
           else
-            echo "WARNING: nginx/nginx.conf not found; will rely on remote existing file"
+            echo "WARNING: nginx/nginx.conf not found; deploy will keep remote file if it exists"
           fi
 
           echo "== bundle tree =="
           find deploy_bundle -maxdepth 3 -type f -print
 
-      # 2) Создать директории на сервере
+      # 2) Создаём каталоги на сервере (на случай первого деплоя)
       - name: Ensure remote dirs
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -109,7 +111,7 @@ jobs:
             set -e
             mkdir -p /root/neptone/docker/nginx
 
-      # 3) Скопировать бандл
+      # 3) Копируем бандл
       - name: Upload deploy bundle via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -136,7 +138,7 @@ jobs:
 
             echo "== IMAGE from CI =="; echo "${IMAGE}"
 
-            # .env для compose
+            # Собираем .env для compose (секреты + тег образа)
             cat > .env <<'ENVV'
             ${{ secrets.ENV_PROD }}
             IMAGE=${{ env.IMAGE }}
@@ -156,13 +158,13 @@ jobs:
             sed -i 's/\r$//' docker-compose.prod.yml || true
             sed -i 's/\t/  /g' docker-compose.prod.yml || true
 
-            # Логины (GHCR обязателен, Hub — если даны секреты)
+            # Логины (GHCR обязателен; Hub — опционально)
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
               echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin || true
             fi
 
-            # Проверка итоговой конфигурации (web.image должен быть ghcr.io/...)
+            # Проверка финальной конфигурации: web.image должен быть ghcr.io/...
             docker compose --env-file .env -f docker-compose.prod.yml config | sed -n '/services:/,$p'
 
             # Обновление и запуск
