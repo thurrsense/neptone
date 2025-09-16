@@ -9,6 +9,7 @@ class User(AbstractUser):
     birth_date = models.DateField(null=True, blank=True, editable=True)
     otp_enabled = models.BooleanField(default=False)
     otp_verified = models.BooleanField(default=False)
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
 
     class Meta:
         db_table = 'users_user'
