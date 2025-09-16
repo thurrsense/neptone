@@ -20,6 +20,7 @@ from users.views import CaptchaGenerateView, CaptchaVerifyView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.conf import settings
 from django.conf.urls.static import static
+from users.views import artist_profile
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -34,6 +35,7 @@ urlpatterns = [
 
     # Users
     path('users/', include('users.urls')),
+    path("u/<str:username>/", artist_profile, name="artist_profile"),
 
     # JWT
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

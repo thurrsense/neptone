@@ -22,9 +22,14 @@ from django.shortcuts import render, redirect, get_object_or_404
 from .forms import RegistrationForm, ProfileForm
 from django.contrib.auth import login
 
-from tracks.forms import TrackForm
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
 from tracks.models import Track
+from tracks.forms import TrackForm
 from django.core.paginator import Paginator
+from django.contrib import messages
+from django.contrib.sessions.models import Session
 
 
 class TOTPSetupView(APIView):
@@ -269,3 +274,60 @@ def delete_my_track(request, pk):
         return redirect("profile")
     # можно сделать confirm-страницу, но для простоты редиректим назад
     return redirect("profile")
+
+
+User = get_user_model()
+
+
+def artist_profile(request, username: str):
+    """Публичная страница артиста /u/<username>/ – видят все"""
+    artist = get_object_or_404(User, username=username)
+    tracks_qs = (
+        Track.objects.filter(owner=artist, is_public=True)
+        .select_related("owner")
+        .order_by("-created_at")
+    )
+    page_obj = Paginator(tracks_qs, 10).get_page(request.GET.get("page"))
+    is_owner = request.user.is_authenticated and request.user == artist
+    return render(
+        request,
+        "users/artist_profile.html",
+        {"artist": artist, "page_obj": page_obj, "is_owner": is_owner},
+    )
+
+
+@login_required
+def settings_profile(request):
+    """Страница настроек профиля (как макет из скрина)"""
+    from .forms import ProfileForm
+    if request.method == "POST":
+        form = ProfileForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Профиль обновлён.")
+            return redirect("settings_profile")
+    else:
+        form = ProfileForm(instance=request.user)
+    return render(request, "users/settings_profile.html", {"form": form})
+
+
+@login_required
+def deactivate_sessions(request):
+    """Разлогинить везде, кроме текущей сессии"""
+    if request.method == "POST":
+        current_key = request.session.session_key
+        for s in Session.objects.all():
+            if s.session_key != current_key:
+                s.delete()
+        messages.success(request, "Активные сессии деактивированы.")
+    return redirect("settings_profile")
+
+
+@login_required
+def delete_account(request):
+    """Удалить аккаунт (упростим: без подтверждения почты)"""
+    if request.method == "POST":
+        u = request.user
+        u.delete()
+        return redirect("home")
+    return redirect("settings_profile")
