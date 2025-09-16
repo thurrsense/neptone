@@ -2,16 +2,22 @@ name: Build & Deploy
 
 on:
   pull_request:
-    branches: [ "dev" ]        # PR в dev — проверочная сборка (без пуша)
+    branches: ["dev"]        # PR в dev — проверочная сборка (без пуша)
   push:
-    branches: [ "main" ]       # пуш в main — сборка + деплой
+    branches: ["main"]       # пуш в main — сборка + деплой
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write           # нужно для push в GHCR
+      packages: write         # нужно для push в GHCR
+    outputs:
+      IMAGE: ${{ steps.meta.outputs.IMAGE }}
     steps:
       - uses: actions/checkout@v4
 
@@ -19,7 +25,7 @@ jobs:
         id: meta
         run: |
           REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "IMAGE=ghcr.io/${REPO_LC}:latest" >> $GITHUB_OUTPUT
+          echo "IMAGE=ghcr.io/${REPO_LC}:latest" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -43,12 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compute image tag (lowercase)
-        id: meta
-        run: |
-          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "IMAGE=ghcr.io/${REPO_LC}:latest" >> $GITHUB_OUTPUT
-
+      # Копируем обновлённый compose-файл ровно в /root/neptone/docker/docker-compose.prod.yml
       - name: Upload docker-compose.prod.yml via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -57,40 +58,45 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           source: "docker/docker-compose.prod.yml"
           target: "/root/neptone/docker/"
+          strip_components: 1
 
       - name: Deploy over SSH (pull & up)
         uses: appleboy/ssh-action@v1.2.0
         env:
-          IMAGE: ${{ steps.meta.outputs.IMAGE }}
+          IMAGE: ${{ needs.build.outputs.IMAGE }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script_stop: true
           script: |
-            set -e
+            set -euo pipefail
             cd /root/neptone/docker
 
+            # Показать, какой файл реально используем
+            echo "== ls -l =="
+            ls -l .
+            echo "== sha256 docker-compose.prod.yml =="
+            sha256sum docker-compose.prod.yml || true
+
+            # Обновим .env (секреты + тег образа)
             cat > .env <<'ENVV'
             ${{ secrets.ENV_PROD }}
-            IMAGE=${{ steps.meta.outputs.IMAGE }}
+            IMAGE=${{ env.IMAGE }}
             ENVV
 
-            # 2) зачистка compose (BOM/CRLF/табов)
+            # Нормализация файла (BOM/CRLF/табуляции)
             sed -i '1s/^\xEF\xBB\xBF//' docker-compose.prod.yml || true
             sed -i 's/\r$//' docker-compose.prod.yml || true
             sed -i 's/\t/  /g' docker-compose.prod.yml || true
 
-            # 3) на всякий случай зачистим BOM/CRLF/табы в compose (безопасно)
-            sed -i '1s/^\xEF\xBB\xBF//' docker-compose.prod.yml || true
-            sed -i 's/\r$//' docker-compose.prod.yml || true
-            sed -i 's/\t/  /g' docker-compose.prod.yml || true
+            # Логин в GHCR перед pull
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            # 4) валидация yaml c подставленными переменными
-            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            # Валидация и запуск
             docker compose --env-file .env -f docker-compose.prod.yml config
-
-            # 5) обновление и запуск
             docker compose --env-file .env -f docker-compose.prod.yml pull
             docker compose --env-file .env -f docker-compose.prod.yml up -d
+
+            # Небольшая уборка
             docker system prune -f
