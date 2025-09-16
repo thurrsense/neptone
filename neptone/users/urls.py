@@ -1,4 +1,9 @@
 from django.urls import path
+from django.contrib.auth.views import (
+    LoginView, LogoutView,
+    PasswordResetView, PasswordResetDoneView,
+    PasswordResetConfirmView, PasswordResetCompleteView,
+)
 from .views import register, edit_profile, RegisterAPIView, LoginAPIView
 from .views import TOTPSetupView, TOTPVerifyView, TOTPLoginView
 
@@ -6,7 +11,17 @@ urlpatterns = [
     # HTML endpoints
     path('register/', register, name='register'),
     path('profile/edit/', edit_profile, name='edit_profile'),
-    
+    path('login/', LoginView.as_view(template_name='users/login.html'), name='login'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+    path('password_reset/', PasswordResetView.as_view(
+        template_name='users/password_reset_form.html'), name='password_reset'),
+    path('password_reset/done/', PasswordResetDoneView.as_view(
+        template_name='users/password_reset_done.html'), name='password_reset_done'),
+    path('reset/<uidb64>/<token>/', PasswordResetConfirmView.as_view(
+        template_name='users/password_reset_confirm.html'), name='password_reset_confirm'),
+    path('reset/done/', PasswordResetCompleteView.as_view(
+        template_name='users/password_reset_complete.html'), name='password_reset_complete'),
+
     # API endpoints
     path('api/register/', RegisterAPIView.as_view(), name='api_register'),
     path('api/login/', LoginAPIView.as_view(), name='api_login'),
