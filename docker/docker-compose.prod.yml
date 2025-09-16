@@ -1,6 +1,6 @@
 services:
   db:
-    image: ghcr.io/library/postgres:16
+    image: postgres:16
     restart: always
     environment:
       POSTGRES_DB: ${DB_NAME}
@@ -35,7 +35,7 @@ services:
       - web_media:/app/media               # <-- общий том с медиа
 
   nginx:
-    image: ghcr.io/library/nginx:1.27-alpine
+    image: nginx:1.27-alpine
     depends_on:
       - web
     ports:
