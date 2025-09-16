@@ -1,3 +1,6 @@
+from .models import User, Follow
+from django.views.decorators.http import require_POST
+from django.shortcuts import get_object_or_404, redirect
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
@@ -220,10 +223,18 @@ User = get_user_model()
 
 def artist_profile(request, username):
     artist = get_object_or_404(User, username=username)
-    tracks = Track.objects.filter(owner=artist).order_by('-created_at')
+    tracks = getattr(artist, "track_set", None)
+    tracks = tracks.all().order_by('-created_at') if tracks else []
+
+    is_following = False
+    if request.user.is_authenticated and request.user != artist:
+        is_following = artist.pk in request.user.following.values_list(
+            'pk', flat=True)
+
     return render(request, "users/artist_profile.html", {
         "artist": artist,
-        "tracks": tracks
+        "tracks": tracks,
+        "is_following": is_following,
     })
 
 
@@ -286,3 +297,23 @@ def delete_my_track(request, pk):
         t.delete()
         messages.success(request, "Трек удалён.")
     return redirect("settings_profile")
+
+
+@require_POST
+@login_required
+def follow_toggle(request, username):
+    target = get_object_or_404(User, username=username)
+    if target == request.user:
+        messages.info(request, "Нельзя подписаться на себя 🙂")
+        return redirect("artist_profile", username=username)
+
+    rel, created = Follow.objects.get_or_create(
+        follower=request.user,
+        following=target,
+    )
+    if created:
+        messages.success(request, f"Вы подписались на {target.username}")
+    else:
+        rel.delete()
+        messages.info(request, f"Вы отписались от {target.username}")
+    return redirect("artist_profile", username=username)
