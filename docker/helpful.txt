@@ -1,0 +1,14 @@
+docker compose -f compose.prod.yml pull
+docker compose -f compose.prod.yml up -d
+
+# проверить, что collectstatic прошёл и файлы видны nginx:
+docker compose -f compose.prod.yml exec web ls -la /app/staticfiles/images
+docker compose -f compose.prod.yml exec nginx ls -la /app/staticfiles/images
+
+# если нужно руками добить миграции/статику:
+docker compose -f compose.prod.yml exec web python manage.py migrate --noinput
+docker compose -f compose.prod.yml exec web python manage.py collectstatic --noinput
+
+# логи
+docker compose -f compose.prod.yml logs -f web
+docker compose -f compose.prod.yml logs -f nginx
