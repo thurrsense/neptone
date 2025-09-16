@@ -16,9 +16,29 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-
+from users.views import CaptchaGenerateView, CaptchaVerifyView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # Капча
+    path('captcha/', include('captcha.urls')),        # для форм
+    path('api/captcha/generate/', CaptchaGenerateView.as_view(),
+         name='captcha-generate'),
+    path('api/captcha/verify/', CaptchaVerifyView.as_view(), name='captcha-verify'),
+    # можно оставить для API, но можно и убрать
+    path('api/captcha/', include('captcha.urls')),
+
+    # Users
     path('users/', include('users.urls')),
+
+    # JWT
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    # Djoser
+    path('api/auth/', include('djoser.urls')),
+
+    # Core
     path('', include('core.urls')),
 ]

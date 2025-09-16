@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Login</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for f in form %}
+    <p>
+        <label for="{{ f.id_for_label }}">{{ f.label }}</label><br>
+        {{ f }} {{ f.errors }}
+    </p>
+    {% endfor %}
+    <button type="submit">Sign in</button>
+</form>
+<p><a href="{% url 'password_reset' %}">Forgot password?</a></p>
+<p><a href="{% url 'register' %}">Create account</a></p>
+{% endblock %}
