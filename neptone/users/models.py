@@ -1,3 +1,5 @@
+from django.db.models import UniqueConstraint, Index
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
@@ -23,3 +25,47 @@ class User(AbstractUser):
             return TOTPDevice.objects.get(user=self, confirmed=True)
         except TOTPDevice.DoesNotExist:
             return None
+
+    @property
+    def followers_count(self):
+        return self.follower_relations.count()
+
+    @property
+    def following_count(self):
+        return self.following_relations.count()
+
+    @property
+    def followers(self):
+        return User.objects.filter(following_relations__following=self)
+
+    @property
+    def following(self):
+        return User.objects.filter(follower_relations__follower=self)
+
+
+class Follow(models.Model):
+    follower = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="following_relations"
+    )
+    following = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="follower_relations"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "users_follow"
+        constraints = [
+            UniqueConstraint(fields=["follower", "following"],
+                             name="uq_follow_follower_following"),
+        ]
+        indexes = [
+            Index(fields=["follower"]),
+            Index(fields=["following"]),
+        ]
+
+    def __str__(self):
+        return f"{self.follower.username} → {self.following.username}"

@@ -1,144 +1,163 @@
-/* ====== Базовая сцена ====== */
+/* Базовый тёмный фон */
+/* базовый фон */
 body {
     background: #0f0f10;
-    /* глубокий тёмный */
     color: #e7e7ea;
 }
 
-.page-wrap {
-    padding-top: 12px;
+/* ===== HERO ===== */
+.artist-hero {
+    position: relative;
+    width: 100%;
+    color: #fff;
+    margin-bottom: 28px;
 }
 
-/* полупрозрачный верхний градиент (виден под фиксированной шапкой) */
-.hero-bg {
-    position: relative;
-    height: 140px;
-    margin-top: -16px;
-    background: radial-gradient(1200px 180px at 20% -40%,
-            rgba(104, 130, 255, .35), transparent 60%),
-        radial-gradient(900px 200px at 90% -30%,
-            rgba(189, 118, 255, .30), transparent 55%),
-        linear-gradient(180deg, rgba(23, 26, 39, .7), rgba(16, 16, 18, 0));
+/* один-единственный hero-bg, растянутый на 100vw и центрированный */
+.artist-hero .hero-bg {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100vw;
+    height: 260px;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.artist-hero .hero-bg::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    /* фиолетовый в ОБЕ стороны, диагональ */
+    background: linear-gradient(135deg, #2a2940 0%, #5a4f85 40%, #3d2f5f 70%, #1d1b22 100%);
+}
+
+.artist-hero .hero-bg::after {
+    content: "";
+    position: absolute;
+    inset: -25% -10% auto -10%;
+    height: 200%;
+    background:
+        radial-gradient(40% 30% at 20% 10%, rgba(118, 136, 255, .18), transparent 60%),
+        radial-gradient(35% 30% at 85% 5%, rgba(210, 140, 255, .16), transparent 60%);
     pointer-events: none;
 }
 
-/* ====== Карточка профиля ====== */
-.profile-card {
-    background: linear-gradient(135deg, rgba(157, 168, 255, .22), rgba(214, 173, 255, .20)) border-box;
-    border-radius: 18px;
-    padding: 0;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, .08);
+.artist-hero .cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: .35;
 }
 
-.profile-cover {
+/* сетка контента */
+.artist-hero-content {
     position: relative;
-    height: 170px;
-    background: radial-gradient(1200px 400px at 30% -60%, rgba(120, 140, 255, .35), rgba(125, 92, 186, .28)),
-        radial-gradient(1200px 400px at 90% 10%, rgba(255, 221, 175, .18), transparent 60%);
-    filter: saturate(110%) blur(.0px);
+    z-index: 1;
+    height: 260px;
+    /* совпадает с высотой фона */
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    /* avatar+текст | пустота/текст | кнопки */
+    align-items: center;
+    gap: 24px;
+    padding: 0 16px;
 }
 
-.profile-cover .cover-img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    opacity: .4;
+/* левая часть */
+.hero-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
 }
 
-.change-cover {
-    position: absolute;
-    right: 18px;
-    top: 16px;
-    backdrop-filter: blur(6px);
-    border: 1px solid rgba(255, 255, 255, .25);
-}
-
-.profile-body {
-    padding: 18px 20px 8px 20px;
-}
-
-.avatar-wrap {
-    width: 92px;
-    height: 92px;
-    border-radius: 14px;
+.avatar-xl {
+    width: 84px;
+    height: 84px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, .35);
-    border: 1px solid rgba(255, 255, 255, .1);
-    background: #1b1c20;
+    background: #111;
+    border: 2px solid rgba(255, 255, 255, .28);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
 }
 
-.avatar {
+.avatar-xl img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block;
+}
+
+.hero-text {
+    min-width: 0;
 }
 
 .artist-name {
-    font-weight: 700;
+    margin: 0 0 8px;
+    font-weight: 800;
+    font-size: 1.9rem;
     letter-spacing: .2px;
 }
 
-.artist-meta .dot {
-    margin: 0 8px;
-    opacity: .45;
-}
-
-/* ====== Таб-навигация ====== */
-.profile-tabs {
-    position: relative;
+.hero-stats {
     display: flex;
     gap: 24px;
-    padding: 10px 20px 16px 20px;
-    border-top: 1px solid rgba(255, 255, 255, .06);
+    flex-wrap: wrap;
 }
 
-.profile-tabs .tab {
-    position: relative;
-    text-decoration: none;
-    color: #d6d6da;
-    font-weight: 700;
-    opacity: .85;
+.stat {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
 }
 
-.profile-tabs .tab:hover {
-    opacity: 1;
-}
-
-.profile-tabs .tab.active {
+.stat-val {
+    font-weight: 800;
     color: #fff;
 }
 
-.profile-tabs .tab-underline {
-    position: absolute;
-    bottom: 8px;
-    left: 20px;
-    height: 2px;
-    width: 28px;
+.stat-label {
+    font-size: .95rem;
+    opacity: .85;
+    color: #d8d8de;
+}
+
+/* кнопки справа */
+.hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn.btn-ghost {
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, .35);
+    background: rgba(17, 17, 20, .25);
+    backdrop-filter: blur(6px);
+}
+
+.btn.btn-ghost:hover {
+    background: rgba(255, 255, 255, .08);
+}
+
+.btn.btn-solid {
+    color: #111;
     background: #fff;
-    border-radius: 2px;
-    transition: transform .25s ease, width .25s ease;
+    border: 1px solid #fff;
 }
 
-/* простая логика позиции — подгоняем под три состояния */
-.profile-tabs .tab.active:nth-of-type(1)~.tab-underline {
-    transform: translateX(0);
-    width: 20px;
+.btn.btn-solid:hover {
+    filter: brightness(.95);
 }
 
-.profile-tabs .tab.active:nth-of-type(2)~.tab-underline {
-    transform: translateX(64px);
-    width: 42px;
+/* общий контейнер под ленту */
+.page-wrap {
+    padding-top: 8px;
 }
 
-.profile-tabs .tab.active:nth-of-type(3)~.tab-underline {
-    transform: translateX(140px);
-    width: 68px;
-}
-
-/* ====== Лента ====== */
+/* ===== ЛЕНТА (твоё существующее) ===== */
 .section-title {
     color: #eaeaf0;
     margin: 22px 0 12px;
@@ -166,12 +185,7 @@ body {
     border-radius: 6px;
     object-fit: cover;
     margin-right: 12px;
-    display: block;
     border: 1px solid rgba(255, 255, 255, .08);
-}
-
-.track-main {
-    line-height: 1.2;
 }
 
 .track-title {
@@ -220,7 +234,6 @@ body {
     filter: brightness(1.1);
 }
 
-/* ====== Утилиты ====== */
 .icon-link {
     text-decoration: none;
     opacity: .9;
@@ -235,18 +248,133 @@ body {
     padding: 16px 0;
 }
 
-/* адаптив: сжимаем отступы */
+/* адаптив */
 @media (max-width: 768px) {
-    .profile-body {
-        padding: 16px;
+    .artist-hero-content {
+        grid-template-columns: 1fr;
+        height: auto;
+        padding-top: 72px;
+        padding-bottom: 28px;
+        justify-items: start;
+        row-gap: 16px;
     }
 
-    .profile-tabs {
-        padding: 8px 16px 14px;
+    .hero-actions {
+        justify-self: start;
     }
 
-    .avatar-wrap {
+    .avatar-xl {
         width: 72px;
         height: 72px;
+    }
+
+    .artist-name {
+        font-size: 1.5rem;
+    }
+}
+
+
+
+/* --- Лента --- */
+.section-title {
+    color: #eaeaf0;
+    margin: 22px 0 12px;
+}
+
+.feed {
+    margin: 6px 0 60px;
+}
+
+.track-row {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .02));
+    border: 1px solid rgba(255, 255, 255, .06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+}
+
+.track-row:hover {
+    background: rgba(255, 255, 255, .055);
+}
+
+.track-cover {
+    width: 64px;
+    height: 64px;
+    border-radius: 6px;
+    object-fit: cover;
+    margin-right: 12px;
+    border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.track-title {
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.track-title:hover {
+    text-decoration: underline;
+}
+
+.track-sub .artist-link {
+    color: #bfc1c8;
+    text-decoration: none;
+}
+
+.track-sub .artist-link:hover {
+    color: #fff;
+}
+
+.track-stats {
+    color: #a9abb3;
+    margin-top: 6px;
+    font-size: .95rem;
+}
+
+.track-stats .dot {
+    margin: 0 8px;
+    opacity: .5;
+}
+
+.play-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    background: linear-gradient(180deg, #3a3b42, #2b2c31);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.play-btn:hover {
+    filter: brightness(1.1);
+}
+
+.icon-link {
+    text-decoration: none;
+    opacity: .9;
+}
+
+.icon-link:hover {
+    opacity: 1;
+}
+
+.empty {
+    color: #b5b6bd;
+    padding: 16px 0;
+}
+
+/* Адаптив */
+@media (max-width: 768px) {
+    .profile-strip {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .ps-actions {
+        justify-content: flex-start;
     }
 }

@@ -7,92 +7,69 @@
 
 {% block content %}
 
-<!-- Hero-градиент под шапкой -->
-<div class="hero-bg"></div>
+<section class="artist-hero">
+    <!-- фон на всю ширину вьюпорта -->
+    <div class="hero-bg" aria-hidden="true">
+        {# если позже добавишь header_image в User — можно раскомментить #}
+        {# {% if artist.header_image %}<img src="{{ artist.header_image.url }}" class="cover-img">{% endif %} #}
+    </div>
 
-<div class="page-wrap container-xxl">
-
-    <!-- ======= Карточка профиля ======= -->
-    <section class="profile-card shadow-lg">
-        <div class="profile-cover">
-            {% if profile.header_image %}
-            <img src="{{ profile.header_image.url }}" alt="" class="cover-img">
-            {% endif %}
-            <button class="btn btn-sm btn-light change-cover">
-                <span class="me-1">🖼️</span> Change header image
-            </button>
-        </div>
-
-        <div class="profile-body d-flex align-items-center">
-            <div class="avatar-wrap">
-                <img src="{{ profile.avatar.url }}" class="avatar" alt="{{ profile.display_name }}">
+    <!-- контент в сетке: слева аватар+текст, справа кнопки -->
+    <div class="artist-hero-content container-xxl">
+        <div class="hero-left">
+            <div class="avatar-xl">
+                {% if artist.avatar %}
+                <img src="{{ artist.avatar.url }}" alt="{{ artist.username }}"
+                    onerror="this.onerror=null;this.src='{% static 'images/avatar-default.png' %}'">
+                {% else %}
+                <img src="{% static 'images/avatar-default.png' %}" alt="{{ artist.username }}">
+                {% endif %}
             </div>
 
-            <div class="flex-grow-1 ms-4">
-                <h2 class="artist-name mb-1">{{ profile.display_name }}</h2>
-                <div class="artist-meta text-muted">
-                    {{ profile.followers_count }} followers
-                    <span class="dot">•</span>
-                    {{ profile.following_count }} following
-                </div>
-            </div>
+            <div class="hero-text">
+                <h1 class="artist-name">{{ artist.username }}</h1>
 
-            <div class="profile-actions d-none d-md-flex align-items-center gap-3">
-                <a class="link-light icon-link" href="#"><span>🔗</span> Share</a>
-                <a class="link-light icon-link" href="{% url 'settings_profile' %}"><span>✏️</span> Edit</a>
-            </div>
-        </div>
-
-        <!-- ======= Вкладки ======= -->
-        <div class="profile-tabs">
-            {% with tab=request.GET.tab|default:"all" %}
-            <a class="tab {% if tab == 'all' %}active{% endif %}" href="?tab=all">All</a>
-            <a class="tab {% if tab == 'tracks' %}active{% endif %}" href="?tab=tracks">Tracks</a>
-            <a class="tab {% if tab == 'playlists' %}active{% endif %}" href="?tab=playlists">Playlists</a>
-            <span class="tab-underline"></span>
-            {% endwith %}
-        </div>
-    </section>
-
-    <!-- ======= Раздел / лента ======= -->
-    <section class="feed">
-        <h5 class="section-title">New realises</h5>
-
-        {% if tracks %}
-        {% for t in tracks %}
-        <article class="track-row">
-            <div class="row g-0 align-items-center">
-                <div class="col-auto">
-                    <img src="{{ t.cover.url }}" alt="" class="track-cover">
-                </div>
-
-                <div class="col">
-                    <div class="track-main">
-                        <a href="{{ t.get_absolute_url }}" class="track-title">{{ t.title }}</a>
-                        <div class="track-sub">
-                            <a href="{% url 'artist_profile' profile.user.username %}" class="artist-link">{{
-                                profile.display_name }}</a>
-                        </div>
-                        <div class="track-stats">
-                            <span class="stat">▶ {{ t.play_count|default:0 }}</span>
-                            <span class="dot">•</span>
-                            <span class="stat">{{ t.duration_display }}</span>
-                            <span class="dot">•</span>
-                            <span class="stat">{{ t.created_at|timesince }} ago</span>
-                        </div>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <span class="stat-val">{{ tracks|length }}</span>
+                        <span class="stat-label">Tracks</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-val">{{ artist.followers_count }}</span>
+                        <span class="stat-label">Followers</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-val">{{ artist.following_count }}</span>
+                        <span class="stat-label">Following</span>
                     </div>
                 </div>
-
-                <div class="col-auto">
-                    <a class="btn play-btn" href="{{ t.get_absolute_url }}#play" aria-label="Play">
-                        <!-- маленький SVG, чтобы не зависеть от иконпаков -->
-                        <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true">
-                            <path d="M6 4.5v9l8-4.5-8-4.5z" />
-                        </svg>
-                    </a>
-                </div>
             </div>
-        </article>
+        </div>
+
+        <div class="hero-actions">
+            {% if user.is_authenticated and user != artist %}
+            <form method="post" action="{% url 'follow_toggle' artist.username %}">
+                {% csrf_token %}
+                {% if is_following %}
+                <button class="btn btn-sm btn-ghost">Unfollow</button>
+                {% else %}
+                <button class="btn btn-sm btn-solid">Follow</button>
+                {% endif %}
+            </form>
+            {% endif %}
+            <a class="btn btn-sm btn-ghost" href="#">Share</a>
+            <a class="btn btn-sm btn-ghost" href="{% url 'settings_profile' %}">Edit</a>
+        </div>
+    </div>
+</section>
+
+<!-- Лента треков -->
+<div class="page-wrap container-xxl">
+    <h5 class="section-title mt-3">Tracks</h5>
+    <section class="feed">
+        {% if tracks %}
+        {% for t in tracks %}
+        {# твой вывод трека как раньше #}
         {% endfor %}
         {% else %}
         <div class="empty">Пока нет публичных треков. Будьте первым, загрузите что-нибудь!</div>
