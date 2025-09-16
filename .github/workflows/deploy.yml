@@ -2,7 +2,7 @@ name: Build & Deploy
 
 on:
   pull_request:
-    branches: [ "dev" ]        # PR в dev — соберём образ (проверка)
+    branches: [ "dev" ]        # PR в dev — проверочная сборка (без пуша)
   push:
     branches: [ "main" ]       # пуш в main — сборка + деплой
 
@@ -11,11 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write          # нужно для push в GHCR
+      packages: write           # нужно для push в GHCR
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compute image tag
+      - name: Compute image tag (lowercase)
         id: meta
         run: |
           REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
@@ -28,14 +28,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build (and push on main)
+      - name: Build (push only on main)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.IMAGE }}
-
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -57,7 +56,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           source: "docker/docker-compose.prod.yml"
-          target: "~/neptone/docker/"
+          target: "/root/neptone/docker/"
 
       - name: Deploy over SSH (pull & up)
         uses: appleboy/ssh-action@v1.2.0
@@ -70,19 +69,28 @@ jobs:
           script_stop: true
           script: |
             set -e
-            mkdir -p ~/neptone/docker
+            cd /root/neptone/docker
 
-            # записываем .env из секрета (ТОЛЬКО переменные приложения)
-            cat > ~/neptone/docker/.env <<'ENVV'
+            cat > .env <<'ENVV'
             ${{ secrets.ENV_PROD }}
+            IMAGE=${{ steps.meta.outputs.IMAGE }}
             ENVV
 
-            cd ~/neptone/docker
+            # 2) зачистка compose (BOM/CRLF/табов)
+            sed -i '1s/^\xEF\xBB\xBF//' docker-compose.prod.yml || true
+            sed -i 's/\r$//' docker-compose.prod.yml || true
+            sed -i 's/\t/  /g' docker-compose.prod.yml || true
 
-            # на всякий случай подменим image в compose на актуальный тег
-            sed -i "s|^\(\s*image:\s*\).*|\1${IMAGE}|" docker-compose.prod.yml
+            # 3) на всякий случай зачистим BOM/CRLF/табы в compose (безопасно)
+            sed -i '1s/^\xEF\xBB\xBF//' docker-compose.prod.yml || true
+            sed -i 's/\r$//' docker-compose.prod.yml || true
+            sed -i 's/\t/  /g' docker-compose.prod.yml || true
 
+            # 4) валидация yaml c подставленными переменными
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            docker compose --env-file .env -f docker-compose.prod.yml config
+
+            # 5) обновление и запуск
             docker compose --env-file .env -f docker-compose.prod.yml pull
             docker compose --env-file .env -f docker-compose.prod.yml up -d
             docker system prune -f
