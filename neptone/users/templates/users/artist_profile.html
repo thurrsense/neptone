@@ -1,72 +1,103 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}{{ artist.username }} · NEPTONE{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/artist.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-0">
 
-    <!-- Верхний блок профиля -->
-    <div class="position-relative" style="height: 250px; background: #222;">
-        {% if artist.cover %}
-        <img src="{{ artist.cover.url }}" class="w-100 h-100 object-fit-cover" style="object-fit: cover;">
-        {% else %}
-        <div class="w-100 h-100 bg-dark"></div>
-        {% endif %}
-        <div class="position-absolute bottom-0 start-0 d-flex align-items-end p-3 text-white">
-            {% if artist.avatar %}
-            <img src="{{ artist.avatar.url }}" class="rounded-circle me-3"
-                style="width:120px;height:120px;object-fit:cover;border:4px solid white;">
-            {% else %}
-            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3"
-                style="width:120px;height:120px;border:4px solid white;">
-                {{ artist.username|first|upper }}
-            </div>
+<!-- Hero-градиент под шапкой -->
+<div class="hero-bg"></div>
+
+<div class="page-wrap container-xxl">
+
+    <!-- ======= Карточка профиля ======= -->
+    <section class="profile-card shadow-lg">
+        <div class="profile-cover">
+            {% if profile.header_image %}
+            <img src="{{ profile.header_image.url }}" alt="" class="cover-img">
             {% endif %}
-            <div>
-                <h2 class="mb-0">{{ artist.username }}</h2>
-                <p class="mb-1 text-muted">{{ artist.bio|default:"Музыкант на NEPTONE" }}</p>
-                {% if user == artist %}
-                <a href="{% url 'edit_profile' %}" class="btn btn-light btn-sm">Редактировать</a>
-                {% endif %}
+            <button class="btn btn-sm btn-light change-cover">
+                <span class="me-1">🖼️</span> Change header image
+            </button>
+        </div>
+
+        <div class="profile-body d-flex align-items-center">
+            <div class="avatar-wrap">
+                <img src="{{ profile.avatar.url }}" class="avatar" alt="{{ profile.display_name }}">
+            </div>
+
+            <div class="flex-grow-1 ms-4">
+                <h2 class="artist-name mb-1">{{ profile.display_name }}</h2>
+                <div class="artist-meta text-muted">
+                    {{ profile.followers_count }} followers
+                    <span class="dot">•</span>
+                    {{ profile.following_count }} following
+                </div>
+            </div>
+
+            <div class="profile-actions d-none d-md-flex align-items-center gap-3">
+                <a class="link-light icon-link" href="#"><span>🔗</span> Share</a>
+                <a class="link-light icon-link" href="{% url 'settings_profile' %}"><span>✏️</span> Edit</a>
             </div>
         </div>
-    </div>
 
-    <!-- Меню -->
-    <div class="border-bottom bg-white px-3">
-        <ul class="nav nav-tabs">
-            <li class="nav-item"><a class="nav-link active" href="#">Все треки</a></li>
-            <li class="nav-item"><a class="nav-link disabled">Альбомы</a></li>
-            <li class="nav-item"><a class="nav-link disabled">Плейлисты</a></li>
-        </ul>
-    </div>
+        <!-- ======= Вкладки ======= -->
+        <div class="profile-tabs">
+            {% with tab=request.GET.tab|default:"all" %}
+            <a class="tab {% if tab == 'all' %}active{% endif %}" href="?tab=all">All</a>
+            <a class="tab {% if tab == 'tracks' %}active{% endif %}" href="?tab=tracks">Tracks</a>
+            <a class="tab {% if tab == 'playlists' %}active{% endif %}" href="?tab=playlists">Playlists</a>
+            <span class="tab-underline"></span>
+            {% endwith %}
+        </div>
+    </section>
 
-    <!-- Лента треков -->
-    <div class="container my-4">
+    <!-- ======= Раздел / лента ======= -->
+    <section class="feed">
+        <h5 class="section-title">New realises</h5>
+
         {% if tracks %}
-        <div class="vstack gap-3">
-            {% for t in tracks %}
-            <div class="card p-3">
-                <div class="d-flex align-items-center gap-3 mb-2">
-                    {% if t.cover %}
-                    <img src="{{ t.cover.url }}" style="width:60px;height:60px;object-fit:cover;" class="rounded">
-                    {% endif %}
-                    <div>
-                        <h5 class="mb-0">{{ t.title }}</h5>
-                        <small class="text-muted">{{ t.created_at|date:"Y-m-d H:i" }}</small>
+        {% for t in tracks %}
+        <article class="track-row">
+            <div class="row g-0 align-items-center">
+                <div class="col-auto">
+                    <img src="{{ t.cover.url }}" alt="" class="track-cover">
+                </div>
+
+                <div class="col">
+                    <div class="track-main">
+                        <a href="{{ t.get_absolute_url }}" class="track-title">{{ t.title }}</a>
+                        <div class="track-sub">
+                            <a href="{% url 'artist_profile' profile.user.username %}" class="artist-link">{{
+                                profile.display_name }}</a>
+                        </div>
+                        <div class="track-stats">
+                            <span class="stat">▶ {{ t.play_count|default:0 }}</span>
+                            <span class="dot">•</span>
+                            <span class="stat">{{ t.duration_display }}</span>
+                            <span class="dot">•</span>
+                            <span class="stat">{{ t.created_at|timesince }} ago</span>
+                        </div>
                     </div>
                 </div>
-                <audio controls style="width:100%;">
-                    <source src="{{ t.audio.url }}" type="audio/mpeg">
-                    Ваш браузер не поддерживает аудио.
-                </audio>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-muted">Этот артист пока ничего не загрузил.</p>
-        {% endif %}
-    </div>
 
+                <div class="col-auto">
+                    <a class="btn play-btn" href="{{ t.get_absolute_url }}#play" aria-label="Play">
+                        <!-- маленький SVG, чтобы не зависеть от иконпаков -->
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true">
+                            <path d="M6 4.5v9l8-4.5-8-4.5z" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+        {% else %}
+        <div class="empty">Пока нет публичных треков. Будьте первым, загрузите что-нибудь!</div>
+        {% endif %}
+    </section>
 </div>
+
 {% endblock %}

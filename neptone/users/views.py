@@ -209,7 +209,7 @@ def register(request):
         if form.is_valid():
             user = form.save()
             login(request, user)           # залогиним сразу
-            return redirect('profile')     # и ведём в профиль
+            return redirect('my_profile')   # и ведём в профиль
     else:
         form = RegistrationForm()
     return render(request, 'users/register.html', {'form': form})
