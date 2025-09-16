@@ -170,5 +170,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Auth redirects
 LOGIN_URL = "login"          # куда @login_required шлёт неавторизованных
-LOGIN_REDIRECT_URL = "profile"
+LOGIN_REDIRECT_URL = 'my_profile'
 LOGOUT_REDIRECT_URL = "home"

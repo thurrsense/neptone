@@ -4,32 +4,33 @@ from django.contrib.auth.views import (
     PasswordResetView, PasswordResetDoneView,
     PasswordResetConfirmView, PasswordResetCompleteView,
 )
-from .views import register, edit_profile, profile
 from .views import TOTPSetupView, TOTPVerifyView, TOTPLoginView
-from .views import delete_my_track
 from .views import (
-    artist_profile, settings_profile,
-    deactivate_sessions, delete_account
+    register,
+    settings_profile,
+    artist_profile,
+    my_profile_redirect,
+    deactivate_sessions,
+    delete_account,
+    delete_my_track,
 )
 
 urlpatterns = [
-    # HTML endpoints
     path("login/",  LoginView.as_view(template_name="users/login.html"), name="login"),
     path("logout/", LogoutView.as_view(next_page="home"), name="logout"),
-
     path("register/", register, name="register"),
-    path("profile/", profile, name="profile"),
-    path("profile/edit/", edit_profile, name="edit_profile"),
 
-    # настройки профиля
+    # Мой профиль -> редирект на публичную страницу себя
+    path("profile/", my_profile_redirect, name="my_profile"),
+
+    # Настройки
     path("settings/", settings_profile, name="settings_profile"),
     path("settings/deactivate-sessions/",
          deactivate_sessions, name="deactivate_sessions"),
     path("settings/delete/", delete_account, name="delete_account"),
 
-    # удалить свой трек
-    path("profile/tracks/<int:pk>/delete/",
-         delete_my_track, name="delete_my_track"),
+    # Удаление своего трека
+    path("tracks/<int:pk>/delete/", delete_my_track, name="delete_my_track"),
     # Password reset (оставь, если реально используешь все шаблоны)
     path("password_reset/", PasswordResetView.as_view(
         template_name="users/password_reset_form.html"), name="password_reset"),
