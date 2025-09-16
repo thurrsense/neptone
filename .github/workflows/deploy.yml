@@ -21,8 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Логин в Docker Hub: только на push (на PR секреты недоступны).
-      # continue-on-error, чтобы не уронить билд, если секретов нет.
+      # Логин в Docker Hub только на push (на PR секреты недоступны)
       - name: Login to Docker Hub
         if: ${{ github.event_name == 'push' }}
         continue-on-error: true
@@ -38,7 +37,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Buildx с драйвером docker-container, чтобы работал GHA cache
       - name: Set up Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
@@ -71,14 +69,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1) Готовим бандл для копирования (исключаем пустые источники = больше не будет "tar: empty archive")
+      # 1) Готовим бандл для копирования (исключаем пустые источники)
       - name: Prepare deploy bundle
         run: |
           set -euo pipefail
           rm -rf deploy_bundle
           mkdir -p deploy_bundle/nginx
 
-          # docker-compose.prod.yml: ищем в корне, затем в docker/
+          # docker-compose.prod.yml: сначала в корне, потом в docker/
           if [ -f "docker-compose.prod.yml" ]; then
             cp "docker-compose.prod.yml" "deploy_bundle/docker-compose.prod.yml"
           elif [ -f "docker/docker-compose.prod.yml" ]; then
@@ -87,7 +85,7 @@ jobs:
             echo "ERROR: docker-compose.prod.yml not found in repo root or docker/"; exit 1
           fi
 
-          # nginx.conf: ищем в nginx/ и docker/nginx/
+          # nginx.conf: в nginx/ или docker/nginx/
           if [ -f "nginx/nginx.conf" ]; then
             cp "nginx/nginx.conf" "deploy_bundle/nginx/nginx.conf"
           elif [ -f "docker/nginx/nginx.conf" ]; then
@@ -99,7 +97,7 @@ jobs:
           echo "== bundle tree =="
           find deploy_bundle -maxdepth 3 -type f -print
 
-      # 2) Создаём каталоги на сервере (на случай первого деплоя)
+      # 2) Создаём каталоги на сервере
       - name: Ensure remote dirs
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -126,24 +124,27 @@ jobs:
       - name: Deploy over SSH (pull & up)
         uses: appleboy/ssh-action@v1.2.0
         env:
-          IMAGE: ${{ needs.build.outputs.IMAGE }}
+          IMAGE: ${{ needs.build.outputs.IMAGE }}   # экспортируем в шаг GH
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script_stop: true
+          envs: IMAGE                                # <<< ПРОКИНУТЬ НА УДАЛЁННЫЙ ХОСТ
           script: |
             set -euo pipefail
             cd /root/neptone/docker
 
-            echo "== IMAGE from CI =="; echo "${IMAGE}"
+            echo "== IMAGE from CI =="
+            echo "${IMAGE}"
 
-            # Собираем .env для compose (секреты + тег образа)
-            cat > .env <<'ENVV'
+            # .env для compose (секреты + тег образа)
+            cat > .env <<ENVV
             ${{ secrets.ENV_PROD }}
-            IMAGE=${{ env.IMAGE }}
+            IMAGE=$IMAGE
             ENVV
 
+            # Проверим, что IMAGE подставился
             if ! grep -qE '^IMAGE=.+$' .env; then
               echo "ERROR: IMAGE is empty in .env"; cat .env; exit 1
             fi
@@ -164,7 +165,7 @@ jobs:
               echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin || true
             fi
 
-            # Проверка финальной конфигурации: web.image должен быть ghcr.io/...
+            # Проверка финальной конфигурации
             docker compose --env-file .env -f docker-compose.prod.yml config | sed -n '/services:/,$p'
 
             # Обновление и запуск
