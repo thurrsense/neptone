@@ -9,21 +9,11 @@ from captcha.helpers import captcha_image_url
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
 from rest_framework.permissions import IsAuthenticated
 from django_otp.plugins.otp_totp.models import TOTPDevice
-from django_otp import login as otp_login
 from .serializers import TOTPSetupSerializer, TOTPVerifySerializer, TOTPLoginSerializer
 from django.shortcuts import redirect, render
 from django.contrib.auth.decorators import login_required
-from .forms import ProfileForm
-from django.shortcuts import redirect, render
-from .forms import RegistrationForm
-from django.contrib.auth import login
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect, get_object_or_404
 from .forms import RegistrationForm, ProfileForm
-from django.contrib.auth import login
-
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from tracks.models import Track
 from tracks.forms import TrackForm
@@ -219,101 +209,59 @@ def register(request):
         if form.is_valid():
             user = form.save()
             login(request, user)           # залогиним сразу
-            return redirect('profile')     # и ведём в профиль
+            return redirect('my_profile')   # и ведём в профиль
     else:
         form = RegistrationForm()
     return render(request, 'users/register.html', {'form': form})
 
 
-@login_required
-def profile(request):
-    # Пагинация твоих треков
-    qs = Track.objects.filter(owner=request.user).order_by("-created_at")
-    page_obj = Paginator(qs, 10).get_page(request.GET.get("page"))
-
-    # Форма загрузки трека (на той же странице)
-    upload_form = TrackForm()
-    if request.method == "POST":
-        upload_form = TrackForm(request.POST, request.FILES)
-        if upload_form.is_valid():
-            track = upload_form.save(commit=False)
-            track.owner = request.user
-            track.save()
-            return redirect("profile")
-
-    return render(
-        request,
-        "users/profile.html",
-        {
-            "user_obj": request.user,
-            "page_obj": page_obj,
-            "upload_form": upload_form,
-        },
-    )
-
-
-@login_required
-def edit_profile(request):
-    if request.method == "POST":
-        form = ProfileForm(request.POST, request.FILES, instance=request.user)
-        if form.is_valid():
-            form.save()
-            return redirect("profile")
-    else:
-        form = ProfileForm(instance=request.user)
-    return render(request, "users/profile_edit.html", {"form": form})
-
-# +++ простое удаление своего трека (POST)
-
-
-@login_required
-def delete_my_track(request, pk):
-    track = get_object_or_404(Track, pk=pk, owner=request.user)
-    if request.method == "POST":
-        track.delete()
-        return redirect("profile")
-    # можно сделать confirm-страницу, но для простоты редиректим назад
-    return redirect("profile")
-
-
 User = get_user_model()
 
 
-def artist_profile(request, username: str):
-    """Публичная страница артиста /u/<username>/ – видят все"""
+def artist_profile(request, username):
     artist = get_object_or_404(User, username=username)
-    tracks_qs = (
-        Track.objects.filter(owner=artist, is_public=True)
-        .select_related("owner")
-        .order_by("-created_at")
-    )
-    page_obj = Paginator(tracks_qs, 10).get_page(request.GET.get("page"))
-    is_owner = request.user.is_authenticated and request.user == artist
-    return render(
-        request,
-        "users/artist_profile.html",
-        {"artist": artist, "page_obj": page_obj, "is_owner": is_owner},
-    )
+    tracks = Track.objects.filter(owner=artist).order_by('-created_at')
+    return render(request, "users/artist_profile.html", {
+        "artist": artist,
+        "tracks": tracks
+    })
+
+
+@login_required
+def my_profile_redirect(request):
+    return redirect("artist_profile", username=request.user.username)
 
 
 @login_required
 def settings_profile(request):
-    """Страница настроек профиля (как макет из скрина)"""
-    from .forms import ProfileForm
-    if request.method == "POST":
+    # Проформа
+    form = ProfileForm(instance=request.user)
+    if request.method == "POST" and request.POST.get("action") == "save_profile":
         form = ProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, "Профиль обновлён.")
             return redirect("settings_profile")
-    else:
-        form = ProfileForm(instance=request.user)
-    return render(request, "users/settings_profile.html", {"form": form})
+
+    # Upload-форма
+    upload_form = TrackForm()
+    if request.method == "POST" and request.POST.get("action") == "upload_track":
+        upload_form = TrackForm(request.POST, request.FILES)
+        if upload_form.is_valid():
+            t = upload_form.save(commit=False)
+            t.owner = request.user
+            t.save()
+            messages.success(request, "Трек загружен.")
+            return redirect("settings_profile")
+
+    return render(request, "users/settings_profile.html", {
+        "form": form,
+        "upload_form": upload_form,
+    })
 
 
 @login_required
 def deactivate_sessions(request):
-    """Разлогинить везде, кроме текущей сессии"""
     if request.method == "POST":
         current_key = request.session.session_key
         for s in Session.objects.all():
@@ -325,9 +273,16 @@ def deactivate_sessions(request):
 
 @login_required
 def delete_account(request):
-    """Удалить аккаунт (упростим: без подтверждения почты)"""
     if request.method == "POST":
-        u = request.user
-        u.delete()
+        request.user.delete()
         return redirect("home")
+    return redirect("settings_profile")
+
+
+@login_required
+def delete_my_track(request, pk):
+    t = get_object_or_404(Track, pk=pk, owner=request.user)
+    if request.method == "POST":
+        t.delete()
+        messages.success(request, "Трек удалён.")
     return redirect("settings_profile")

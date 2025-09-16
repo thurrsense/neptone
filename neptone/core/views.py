@@ -4,11 +4,9 @@ from tracks.models import Track
 
 
 def home(request):
-    # Гость видит лендинг
     if not request.user.is_authenticated:
-        return render(request, "core/landing.html")
+        return render(request, "core/landing.html")  # твой старый лендинг
 
-    # Авторизованный видит ленту публичных треков
     qs = Track.objects.filter(is_public=True).select_related(
         "owner").order_by("-created_at")
     page_obj = Paginator(qs, 10).get_page(request.GET.get("page"))
