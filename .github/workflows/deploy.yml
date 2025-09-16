@@ -94,6 +94,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           source: "docker/docker-compose.prod.yml"
           target: "/root/neptone/docker/"
+          strip_components: 1  
           overwrite: true
 
       - name: Upload nginx.conf via SCP
@@ -104,6 +105,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           source: "docker/nginx.conf"
           target: "/root/neptone/docker/"
+          strip_components: 1  
           overwrite: true
 
       # Деплой
@@ -164,3 +166,15 @@ jobs:
 
             # лёгкая уборка
             docker system prune -f
+
+      - name: Verify files on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            ls -l /root/neptone/docker
+            [ -f /root/neptone/docker/docker-compose.prod.yml ]
+            [ -f /root/neptone/docker/nginx.conf ]
