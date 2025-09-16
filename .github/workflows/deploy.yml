@@ -170,4 +170,8 @@ jobs:
             docker compose --env-file .env -f docker-compose.prod.yml pull
             docker compose --env-file .env -f docker-compose.prod.yml up -d
 
+            # Check static
+            docker compose --env-file .env -f docker-compose.prod.yml exec -T nginx \
+              sh -lc 'ls -1 /app/staticfiles | head -n 5'
+
             docker system prune -f
