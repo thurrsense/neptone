@@ -1,49 +1,35 @@
 {% extends "base.html" %}
-{% load static %}
-
+{% block title %}Регистрация · NEPTONE{% endblock %}
 {% block content %}
-<div class="auth-container">
-  <div class="auth-card">
-    <!-- Логотип -->
-    <img src="{% static 'images/logo.svg' %}" alt="NEPTONE">
+<form method="post" novalidate>
+  {% csrf_token %}
+  {{ form.non_field_errors }}
 
-    <!-- Форма регистрации -->
-    <form method="post" class="auth-form">
-      {% csrf_token %}
-
-      <div class="form-group">
-        <label for="{{ form.username.id_for_label }}">Username</label>
-        {{ form.username }}
-        {% if form.username.errors %}
-        <div class="error">{{ form.username.errors }}</div>
-        {% endif %}
-      </div>
-
-      <div class="form-group">
-        <label>Password (1-0, Aa)</label>
-        {{ form.password1 }}
-      </div>
-
-      <div class="form-group">
-        <label>Confirm Password</label>
-        {{ form.password2 }}
-      </div>
-
-      <button type="submit" class="btn-primary">
-        <span>Continue</span>
-      </button>
-    </form>
-
-    <!-- Разделитель -->
-    <div class="auth-divider">
-      <span>or</span>
-    </div>
-
-    <!-- Ссылки -->
-    <div class="auth-links">
-      <a href="{% url 'login' %}" class="text-link">Forgot your password?</a>
-      <a href="{% url 'login' %}" class="text-link">You don't have an account? Sign up</a>
-    </div>
+  <div class="mb-3">
+    <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
+    {{ form.username }} <div class="text-danger small">{{ form.username.errors }}</div>
   </div>
-</div>
+
+  <div class="mb-3">
+    <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
+    {{ form.email }} <div class="text-danger small">{{ form.email.errors }}</div>
+  </div>
+
+  <div class="mb-3">
+    <label for="{{ form.password1.id_for_label }}" class="form-label">Password</label>
+    {{ form.password1 }} <div class="text-danger small">{{ form.password1.errors }}</div>
+  </div>
+
+  <div class="mb-3">
+    <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm</label>
+    {{ form.password2 }} <div class="text-danger small">{{ form.password2.errors }}</div>
+  </div>
+
+  <div class="mb-3">
+    <label for="{{ form.captcha.id_for_label }}" class="form-label">Captcha</label>
+    {{ form.captcha }} <div class="text-danger small">{{ form.captcha.errors }}</div>
+  </div>
+
+  <button class="btn btn-dark w-100" type="submit">Зарегистрироваться</button>
+</form>
 {% endblock %}

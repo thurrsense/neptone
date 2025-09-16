@@ -167,6 +167,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-LOGIN_URL = "login"          # имя урла логина (а не путь)
+# Auth redirects
+LOGIN_URL = "login"          # куда @login_required шлёт неавторизованных
 LOGIN_REDIRECT_URL = "profile"
 LOGOUT_REDIRECT_URL = "home"
