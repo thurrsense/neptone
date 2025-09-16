@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Settings · NEPTONE{% endblock %}
+{% block content %}
+
+<div class="row g-4">
+    <div class="col-12 col-lg-8">
+
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Профиль</h2>
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save_profile">
+                    {{ form.non_field_errors }}
+
+                    <div class="mb-2">
+                        <label class="form-label">Email</label>
+                        {{ form.email }} <div class="text-danger small">{{ form.email.errors }}</div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Имя / Фамилия</label>
+                        <div class="d-flex gap-2">
+                            {{ form.first_name }} {{ form.last_name }}
+                        </div>
+                        <div class="text-danger small">{{ form.first_name.errors }} {{ form.last_name.errors }}</div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">День рождения</label>
+                        {{ form.birth_date }} <div class="text-danger small">{{ form.birth_date.errors }}</div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Био</label>
+                        {{ form.bio }} <div class="text-danger small">{{ form.bio.errors }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Аватар</label>
+                        {{ form.avatar }} <div class="text-danger small">{{ form.avatar.errors }}</div>
+                    </div>
+
+                    <button class="btn btn-dark" type="submit">Сохранить</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4 mb-4" id="upload">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Upload трека</h2>
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="upload_track">
+                    {{ upload_form.non_field_errors }}
+
+                    <div class="mb-2">
+                        <label class="form-label">Название</label>
+                        {{ upload_form.title }} <div class="text-danger small">{{ upload_form.title.errors }}</div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Аудио</label>
+                        {{ upload_form.audio }} <div class="text-danger small">{{ upload_form.audio.errors }}</div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Обложка (опц.)</label>
+                        {{ upload_form.cover }} <div class="text-danger small">{{ upload_form.cover.errors }}</div>
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ upload_form.is_public }}
+                        <label class="form-check-label">Публичный</label>
+                    </div>
+
+                    <button class="btn btn-dark" type="submit">Загрузить</button>
+                </form>
+                <div class="form-text mt-2">До 50 МБ. При необходимости увеличь `client_max_body_size` в nginx.</div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="list-group list-group-flush">
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                    href="{% url 'password_reset' %}">
+                    <span>Сбросить пароль</span> <span>🔐</span>
+                </a>
+
+                <form class="list-group-item d-flex justify-content-between align-items-center m-0" method="post"
+                    action="{% url 'deactivate_sessions' %}">
+                    {% csrf_token %}
+                    <span>Разлогинить активные сессии</span>
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">Run</button>
+                </form>
+
+                <form class="list-group-item d-flex justify-content-between align-items-center m-0" method="post"
+                    action="{% url 'delete_account' %}">
+                    {% csrf_token %}
+                    <span class="text-danger">Удалить аккаунт</span>
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

@@ -1,34 +1,61 @@
 {% extends "base.html" %}
-{% load static %}
-
-{% block title %}Главная · NEPTONE{% endblock %}
-
+{% block title %}NEPTONE · Feed{% endblock %}
 {% block content %}
-<div class="container text-center mt-5">
-    <!-- Логотип / название -->
-    <img src="{% static 'images/logo.svg' %}" alt="NEPTONE" class="mb-4" style="height:80px;">
 
-    <h1 class="display-3 fw-bold mb-3">NEPTONE</h1>
-    <p class="lead text-muted mb-4">
-        Храни, слушай и делись музыкой.<br>
-        Добавляй эффекты и находи новых исполнителей 🎶
-    </p>
-
-    <!-- CTA кнопки -->
-    {% if user.is_authenticated %}
-    <a href="{% url 'edit_profile' %}" class="btn btn-primary btn-lg me-3">
-        Мой профиль
-    </a>
-    <a href="{% url 'logout' %}" class="btn btn-outline-secondary btn-lg">
-        Выйти
-    </a>
-    {% else %}
-    <a href="{% url 'register' %}" class="btn btn-primary btn-lg me-3">
-        Регистрация
-    </a>
-    <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-lg">
-        Войти
-    </a>
-    {% endif %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 m-0">Лента</h1>
 </div>
+
+{% if page_obj and page_obj.object_list %}
+<div class="vstack gap-3">
+    {% for t in page_obj.object_list %}
+    <div class="card border rounded-4 p-3">
+        <div class="d-flex align-items-center gap-3 mb-2">
+            {% if t.owner.avatar %}
+            <img src="{{ t.owner.avatar.url }}" class="rounded-circle" style="width:40px;height:40px;object-fit:cover;">
+            {% else %}
+            <div class="rounded-circle bg-secondary d-inline-flex align-items-center justify-content-center"
+                style="width:40px;height:40px;color:#fff;">{{ t.owner.username|first|upper }}</div>
+            {% endif %}
+            <div>
+                <div class="fw-medium m-0">{{ t.title }}</div>
+                <div class="text-muted small">
+                    <a href="{% url 'artist_profile' t.owner.username %}" class="text-decoration-none">{{
+                        t.owner.username }}</a>
+                    · {{ t.created_at|date:"Y-m-d H:i" }}
+                </div>
+            </div>
+        </div>
+
+        {% if t.cover %}
+        <img src="{{ t.cover.url }}" class="mb-2" style="max-width:100%;height:auto;">
+        {% endif %}
+
+        <audio controls style="width:100%;">
+            <source src="{{ t.audio.url }}" type="audio/mpeg">
+            <source src="{{ t.audio.url }}" type="audio/wav">
+            <source src="{{ t.audio.url }}" type="audio/ogg">
+            Ваш браузер не поддерживает воспроизведение аудио.
+        </audio>
+    </div>
+    {% endfor %}
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination mb-0">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Назад</a></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Стр. {{ page_obj.number }} из {{
+                page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Вперёд</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% else %}
+<div class="text-muted">Пока нет публичных треков. Будьте первым, загрузите что-нибудь!</div>
+{% endif %}
 {% endblock %}

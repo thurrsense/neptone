@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django_otp',
     'django_otp.plugins.otp_totp',  # TOTP (Time-based OTP)
     'django_otp.plugins.otp_static',  # Backup codes
+    'tracks',
 ]
 # REST Framework
 REST_FRAMEWORK = {
@@ -169,5 +170,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Auth redirects
 LOGIN_URL = "login"          # куда @login_required шлёт неавторизованных
-LOGIN_REDIRECT_URL = "profile"
+LOGIN_REDIRECT_URL = 'my_profile'
 LOGOUT_REDIRECT_URL = "home"

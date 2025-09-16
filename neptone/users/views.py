@@ -1,3 +1,6 @@
+from .models import User, Follow
+from django.views.decorators.http import require_POST
+from django.shortcuts import get_object_or_404, redirect
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
@@ -9,14 +12,17 @@ from captcha.helpers import captcha_image_url
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
 from rest_framework.permissions import IsAuthenticated
 from django_otp.plugins.otp_totp.models import TOTPDevice
-from django_otp import login as otp_login
 from .serializers import TOTPSetupSerializer, TOTPVerifySerializer, TOTPLoginSerializer
 from django.shortcuts import redirect, render
 from django.contrib.auth.decorators import login_required
-from .forms import ProfileForm
-from django.shortcuts import redirect, render
-from .forms import RegistrationForm
-from django.contrib.auth import login
+from .forms import RegistrationForm, ProfileForm
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth import get_user_model
+from tracks.models import Track
+from tracks.forms import TrackForm
+from django.core.paginator import Paginator
+from django.contrib import messages
+from django.contrib.sessions.models import Session
 
 
 class TOTPSetupView(APIView):
@@ -206,24 +212,108 @@ def register(request):
         if form.is_valid():
             user = form.save()
             login(request, user)           # залогиним сразу
-            return redirect('profile')     # и ведём в профиль
+            return redirect('my_profile')   # и ведём в профиль
     else:
         form = RegistrationForm()
     return render(request, 'users/register.html', {'form': form})
 
 
-@login_required
-def profile(request):
-    return render(request, "users/profile.html", {"user_obj": request.user})
+User = get_user_model()
+
+
+def artist_profile(request, username):
+    artist = get_object_or_404(User, username=username)
+    tracks = getattr(artist, "track_set", None)
+    tracks = tracks.all().order_by('-created_at') if tracks else []
+
+    is_following = False
+    if request.user.is_authenticated and request.user != artist:
+        is_following = artist.pk in request.user.following.values_list(
+            'pk', flat=True)
+
+    return render(request, "users/artist_profile.html", {
+        "artist": artist,
+        "tracks": tracks,
+        "is_following": is_following,
+    })
 
 
 @login_required
-def edit_profile(request):
-    if request.method == "POST":
+def my_profile_redirect(request):
+    return redirect("artist_profile", username=request.user.username)
+
+
+@login_required
+def settings_profile(request):
+    # Проформа
+    form = ProfileForm(instance=request.user)
+    if request.method == "POST" and request.POST.get("action") == "save_profile":
         form = ProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
-            return redirect("profile")
+            messages.success(request, "Профиль обновлён.")
+            return redirect("settings_profile")
+
+    # Upload-форма
+    upload_form = TrackForm()
+    if request.method == "POST" and request.POST.get("action") == "upload_track":
+        upload_form = TrackForm(request.POST, request.FILES)
+        if upload_form.is_valid():
+            t = upload_form.save(commit=False)
+            t.owner = request.user
+            t.save()
+            messages.success(request, "Трек загружен.")
+            return redirect("settings_profile")
+
+    return render(request, "users/settings_profile.html", {
+        "form": form,
+        "upload_form": upload_form,
+    })
+
+
+@login_required
+def deactivate_sessions(request):
+    if request.method == "POST":
+        current_key = request.session.session_key
+        for s in Session.objects.all():
+            if s.session_key != current_key:
+                s.delete()
+        messages.success(request, "Активные сессии деактивированы.")
+    return redirect("settings_profile")
+
+
+@login_required
+def delete_account(request):
+    if request.method == "POST":
+        request.user.delete()
+        return redirect("home")
+    return redirect("settings_profile")
+
+
+@login_required
+def delete_my_track(request, pk):
+    t = get_object_or_404(Track, pk=pk, owner=request.user)
+    if request.method == "POST":
+        t.delete()
+        messages.success(request, "Трек удалён.")
+    return redirect("settings_profile")
+
+
+@require_POST
+@login_required
+def follow_toggle(request, username):
+    target = get_object_or_404(User, username=username)
+    if target == request.user:
+        messages.info(request, "Нельзя подписаться на себя 🙂")
+        return redirect("artist_profile", username=username)
+
+    rel, created = Follow.objects.get_or_create(
+        follower=request.user,
+        following=target,
+    )
+    if created:
+        messages.success(request, f"Вы подписались на {target.username}")
     else:
-        form = ProfileForm(instance=request.user)
-    return render(request, "users/profile_edit.html", {"form": form})
+        rel.delete()
+        messages.info(request, f"Вы отписались от {target.username}")
+    return redirect("artist_profile", username=username)

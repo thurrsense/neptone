@@ -1,8 +1,16 @@
 from django.shortcuts import render
+from django.core.paginator import Paginator
+from tracks.models import Track
 
 
 def home(request):
-    return render(request, 'core/home.html')
+    if not request.user.is_authenticated:
+        return render(request, "core/landing.html")  # твой старый лендинг
+
+    qs = Track.objects.filter(is_public=True).select_related(
+        "owner").order_by("-created_at")
+    page_obj = Paginator(qs, 10).get_page(request.GET.get("page"))
+    return render(request, "core/home.html", {"page_obj": page_obj})
 
 
 def handle_404(request, exception):
