@@ -1,0 +1,44 @@
+{# templates/404.html #}
+{% extends "base.html" %}
+
+{% block title %}Страница не найдена — NEPTONE{% endblock %}
+
+{% block extra_head %}
+<style>
+    .ghost {
+        font-size: 72px;
+        line-height: 1;
+    }
+
+    .muted {
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <div class="ghost mb-3">👻</div>
+    <h1 class="h3 fw-bold mb-2">404 — Страница не найдена</h1>
+    <p class="muted mb-4">
+        Похоже, вы попали не туда. Ссылка могла устареть или быть удалена.
+    </p>
+
+    <div class="d-flex gap-2 justify-content-center mb-4">
+        <a href="/" class="btn btn-brand px-3">На главную</a>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary px-3">Назад</a>
+    </div>
+
+    {# Если у тебя есть встроенный поиск — раскомментируй форму ниже и поменяй action #}
+    {#
+    <form action="{% url 'search' %}" method="get" class="d-flex gap-2 justify-content-center">
+        <input type="search" name="q" class="form-control" placeholder="Найти на сайте…" style="max-width:320px">
+        <button class="btn btn-dark">Искать</button>
+    </form>
+    #}
+
+    <div class="mt-4 small muted">
+        Код ошибки: 404 • Если проблема повторяется — напишите нам.
+    </div>
+</div>
+{% endblock %}
