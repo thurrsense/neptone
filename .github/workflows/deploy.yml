@@ -68,8 +68,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Создаём директории на сервере
-      - name: Ensure remote dirs
+      # 0) На всякий случай: положим обновлённый compose в корень репо тоже
+      - name: Ensure flattened compose in repo root (optional)
+        run: |
+          cp docker/docker-compose.prod.yml docker-compose.prod.yml
+
+      # 1) Подготовить место на сервере и удалить кривые остатки
+      - name: Prepare remote dir (cleanup)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -78,9 +83,14 @@ jobs:
           script_stop: true
           script: |
             set -e
-            mkdir -p /root/neptone/docker/nginx
+            mkdir -p /root/neptone/docker
+            # удалить папку/файл, если вдруг есть с именем compose
+            [ -d /root/neptone/docker/docker-compose.prod.yml ] && rm -rf /root/neptone/docker/docker-compose.prod.yml || true
+            [ -f /root/neptone/docker/docker-compose.prod.yml ] && rm -f /root/neptone/docker/docker-compose.prod.yml || true
+            # удалить старую папку nginx, раз теперь файл лежит в корне
+            [ -d /root/neptone/docker/nginx ] && rm -rf /root/neptone/docker/nginx || true
 
-      # Копируем compose в /root/neptone/docker/  (срезаем префикс "docker/")
+      # 2) Копируем ОБА файла прямо в /root/neptone/docker/
       - name: Upload compose via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -91,9 +101,7 @@ jobs:
           target: "/root/neptone/docker/"
           strip_components: 1
           overwrite: true
-          debug: true
 
-      # Копируем nginx.conf в /root/neptone/docker/nginx/
       - name: Upload nginx.conf via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -101,12 +109,11 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           source: "docker/nginx.conf"
-          target: "/root/neptone/docker/nginx/"
+          target: "/root/neptone/docker/"
           strip_components: 1
           overwrite: true
-          debug: true
 
-      # Быстрая проверка: что реально лежит на сервере после копирования
+      # 3) Проверка на сервере, что оба файла лежат в КОРНЕ
       - name: Verify files on server
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -117,12 +124,12 @@ jobs:
           script: |
             set -e
             cd /root/neptone/docker
-            echo "== tree =="
-            find . -maxdepth 2 -type f -print
+            echo "== listing =="
+            ls -la
             [ -f docker-compose.prod.yml ] || (echo "docker-compose.prod.yml MISSING"; exit 1)
-            [ -f nginx/nginx.conf ] || (echo "nginx/nginx.conf MISSING"; exit 1)
+            [ -f nginx.conf ] || (echo "nginx.conf MISSING"; exit 1)
 
-      # Деплой
+      # 4) Деплой
       - name: Deploy over SSH (pull & up)
         uses: appleboy/ssh-action@v1.2.0
         env:
@@ -140,6 +147,7 @@ jobs:
             echo "== IMAGE from CI =="
             echo "$IMAGE"
 
+            # .env для compose
             cat > .env <<ENVV
             ${{ secrets.ENV_PROD }}
             IMAGE=$IMAGE
