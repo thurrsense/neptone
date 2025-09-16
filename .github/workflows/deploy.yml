@@ -17,11 +17,10 @@ jobs:
       contents: read
       packages: write
     outputs:
-      IMAGE: ${{ steps.meta.outputs.IMAGE }}   # пробрасываем IMAGE в deploy
+      IMAGE: ${{ steps.meta.outputs.IMAGE }}
     steps:
       - uses: actions/checkout@v4
 
-      # Логин в Docker Hub (чтобы не упираться в rate limit), делаем только на push
       - name: Login to Docker Hub
         if: ${{ github.event_name == 'push' }}
         continue-on-error: true
@@ -69,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Создаём директории на сервере под конфиги
+      # Создаём директории на сервере
       - name: Ensure remote dirs
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -81,7 +80,7 @@ jobs:
             set -e
             mkdir -p /root/neptone/docker/nginx
 
-      # Копируем docker-compose.prod.yml ТОЧНО в нужный путь
+      # Копируем compose в /root/neptone/docker/  (срезаем префикс "docker/")
       - name: Upload compose via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -89,10 +88,12 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           source: "docker/docker-compose.prod.yml"
-          target: "/root/neptone/docker/docker-compose.prod.yml"
+          target: "/root/neptone/docker/"
+          strip_components: 1
           overwrite: true
+          debug: true
 
-      # Копируем nginx.conf ТОЧНО в нужный путь
+      # Копируем nginx.conf в /root/neptone/docker/nginx/
       - name: Upload nginx.conf via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -100,14 +101,32 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           source: "docker/nginx.conf"
-          target: "/root/neptone/docker/nginx/nginx.conf"
+          target: "/root/neptone/docker/nginx/"
+          strip_components: 1
           overwrite: true
+          debug: true
+
+      # Быстрая проверка: что реально лежит на сервере после копирования
+      - name: Verify files on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            cd /root/neptone/docker
+            echo "== tree =="
+            find . -maxdepth 2 -type f -print
+            [ -f docker-compose.prod.yml ] || (echo "docker-compose.prod.yml MISSING"; exit 1)
+            [ -f nginx/nginx.conf ] || (echo "nginx/nginx.conf MISSING"; exit 1)
 
       # Деплой
       - name: Deploy over SSH (pull & up)
         uses: appleboy/ssh-action@v1.2.0
         env:
-          IMAGE: ${{ needs.build.outputs.IMAGE }}   # прокидываем из build
+          IMAGE: ${{ needs.build.outputs.IMAGE }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -121,31 +140,25 @@ jobs:
             echo "== IMAGE from CI =="
             echo "$IMAGE"
 
-            # .env для compose (секреты + тег образа)
             cat > .env <<ENVV
             ${{ secrets.ENV_PROD }}
             IMAGE=$IMAGE
             ENVV
-
-            # Проверим, что всё на месте
-            [ -f docker-compose.prod.yml ] || (echo "docker-compose.prod.yml MISSING"; exit 1)
-            [ -f nginx/nginx.conf ] || (echo "nginx/nginx.conf MISSING"; exit 1)
 
             # Нормализация и валидация
             sed -i '1s/^\xEF\xBB\xBF//' docker-compose.prod.yml || true
             sed -i 's/\r$//' docker-compose.prod.yml || true
             sed -i 's/\t/  /g' docker-compose.prod.yml || true
 
-            # Логин в реестры
+            # Логины
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
               echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin || true
             fi
 
-            # Проверка финальной конфигурации (у web должен быть image: ghcr.io/...)
+            # Проверка финальной конфигурации (у web должен быть image: ghcr.io/…)
             docker compose --env-file .env -f docker-compose.prod.yml config | sed -n '/services:/,$p'
 
-            # Обновление и запуск
             docker compose --env-file .env -f docker-compose.prod.yml pull
             docker compose --env-file .env -f docker-compose.prod.yml up -d
 
