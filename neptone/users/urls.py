@@ -6,6 +6,8 @@ from django.contrib.auth.views import (
 )
 from .views import register, edit_profile, profile
 from .views import TOTPSetupView, TOTPVerifyView, TOTPLoginView
+from .views import delete_my_track
+
 
 urlpatterns = [
     # HTML endpoints
@@ -13,9 +15,12 @@ urlpatterns = [
     path("logout/", LogoutView.as_view(next_page="home"), name="logout"),
 
     path("register/", register, name="register"),
-    path("profile/",  profile, name="profile"),
+    path("profile/", profile, name="profile"),
     path("profile/edit/", edit_profile, name="edit_profile"),
 
+    # удалить свой трек
+    path("profile/tracks/<int:pk>/delete/",
+         delete_my_track, name="delete_my_track"),
     # Password reset (оставь, если реально используешь все шаблоны)
     path("password_reset/", PasswordResetView.as_view(
         template_name="users/password_reset_form.html"), name="password_reset"),
