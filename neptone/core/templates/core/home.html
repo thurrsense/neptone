@@ -10,7 +10,7 @@
 
     {% if user.is_authenticated %}
     <div class="d-flex gap-2">
-        <!-- Upload: ведём на профиль, где внизу форма загрузки трека -->
+        <!-- ведём на форму загрузки на странице профиля -->
         <a class="btn btn-dark" href="{% url 'profile' %}#upload">Upload</a>
         <a class="btn btn-outline-dark" href="{% url 'profile' %}">Мой профиль</a>
     </div>
@@ -39,7 +39,11 @@
             <div>
                 <div class="fw-medium m-0">{{ t.title }}</div>
                 <div class="text-muted small">
-                    {{ t.owner.username }} · {{ t.created_at|date:"Y-m-d H:i" }}
+                    <!-- ССЫЛКА НА ПУБЛИЧНЫЙ ПРОФИЛЬ АВТОРА -->
+                    <a href="{% url 'artist_profile' t.owner.username %}" class="text-decoration-none">
+                        {{ t.owner.username }}
+                    </a>
+                    · {{ t.created_at|date:"Y-m-d H:i" }}
                 </div>
             </div>
         </div>

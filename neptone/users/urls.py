@@ -7,7 +7,10 @@ from django.contrib.auth.views import (
 from .views import register, edit_profile, profile
 from .views import TOTPSetupView, TOTPVerifyView, TOTPLoginView
 from .views import delete_my_track
-
+from .views import (
+    artist_profile, settings_profile,
+    deactivate_sessions, delete_account
+)
 
 urlpatterns = [
     # HTML endpoints
@@ -17,6 +20,12 @@ urlpatterns = [
     path("register/", register, name="register"),
     path("profile/", profile, name="profile"),
     path("profile/edit/", edit_profile, name="edit_profile"),
+
+    # настройки профиля
+    path("settings/", settings_profile, name="settings_profile"),
+    path("settings/deactivate-sessions/",
+         deactivate_sessions, name="deactivate_sessions"),
+    path("settings/delete/", delete_account, name="delete_account"),
 
     # удалить свой трек
     path("profile/tracks/<int:pk>/delete/",
