@@ -13,6 +13,7 @@ from .views import (
     deactivate_sessions,
     delete_account,
     delete_my_track,
+    follow_toggle,
 )
 
 urlpatterns = [
@@ -40,6 +41,9 @@ urlpatterns = [
         template_name="users/password_reset_confirm.html"), name="password_reset_confirm"),
     path("reset/done/", PasswordResetCompleteView.as_view(
         template_name="users/password_reset_complete.html"), name="password_reset_complete"),
+
+    path("u/<str:username>/follow-toggle/",
+         follow_toggle, name="follow_toggle"),
 
     # API endpoints (2FA/JWT)
     path("api/2fa/setup/",  TOTPSetupView.as_view(),  name="2fa_setup"),
