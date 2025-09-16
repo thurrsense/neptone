@@ -44,6 +44,8 @@ urlpatterns = [
 
     # Core
     path('', include('core.urls')),
+    path("tracks/", include("tracks.urls")),
+
 ]
 
 if settings.DEBUG:

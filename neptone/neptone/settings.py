@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django_otp',
     'django_otp.plugins.otp_totp',  # TOTP (Time-based OTP)
     'django_otp.plugins.otp_static',  # Backup codes
+    'tracks',
 ]
 # REST Framework
 REST_FRAMEWORK = {
