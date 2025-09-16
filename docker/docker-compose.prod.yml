@@ -6,6 +6,10 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: db
+      DB_PORT: 5432
+      STATIC_ROOT: /app/staticfiles   # ← скажем Django куда складывать в проде
+      MEDIA_ROOT: /app/media
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
