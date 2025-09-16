@@ -4,7 +4,7 @@ from django.contrib.auth.views import (
     PasswordResetView, PasswordResetDoneView,
     PasswordResetConfirmView, PasswordResetCompleteView,
 )
-from .views import register, edit_profile, RegisterAPIView, LoginAPIView
+from .views import register, edit_profile, RegisterAPIView, LoginAPIView, profile
 from .views import TOTPSetupView, TOTPVerifyView, TOTPLoginView
 
 urlpatterns = [
@@ -21,7 +21,9 @@ urlpatterns = [
         template_name='users/password_reset_confirm.html'), name='password_reset_confirm'),
     path('reset/done/', PasswordResetCompleteView.as_view(
         template_name='users/password_reset_complete.html'), name='password_reset_complete'),
-
+    path('profile/', profile, name='profile'),
+    path("login/", LoginView.as_view(template_name="users/login.html"), name="login"),
+    path("profile/", profile, name="profile"),
     # API endpoints
     path('api/register/', RegisterAPIView.as_view(), name='api_register'),
     path('api/login/', LoginAPIView.as_view(), name='api_login'),
