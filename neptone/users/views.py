@@ -17,6 +17,14 @@ from .forms import ProfileForm
 from django.shortcuts import redirect, render
 from .forms import RegistrationForm
 from django.contrib.auth import login
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect, get_object_or_404
+from .forms import RegistrationForm, ProfileForm
+from django.contrib.auth import login
+
+from tracks.forms import TrackForm
+from tracks.models import Track
+from django.core.paginator import Paginator
 
 
 class TOTPSetupView(APIView):
@@ -214,7 +222,29 @@ def register(request):
 
 @login_required
 def profile(request):
-    return render(request, "users/profile.html", {"user_obj": request.user})
+    # Пагинация твоих треков
+    qs = Track.objects.filter(owner=request.user).order_by("-created_at")
+    page_obj = Paginator(qs, 10).get_page(request.GET.get("page"))
+
+    # Форма загрузки трека (на той же странице)
+    upload_form = TrackForm()
+    if request.method == "POST":
+        upload_form = TrackForm(request.POST, request.FILES)
+        if upload_form.is_valid():
+            track = upload_form.save(commit=False)
+            track.owner = request.user
+            track.save()
+            return redirect("profile")
+
+    return render(
+        request,
+        "users/profile.html",
+        {
+            "user_obj": request.user,
+            "page_obj": page_obj,
+            "upload_form": upload_form,
+        },
+    )
 
 
 @login_required
@@ -227,3 +257,15 @@ def edit_profile(request):
     else:
         form = ProfileForm(instance=request.user)
     return render(request, "users/profile_edit.html", {"form": form})
+
+# +++ простое удаление своего трека (POST)
+
+
+@login_required
+def delete_my_track(request, pk):
+    track = get_object_or_404(Track, pk=pk, owner=request.user)
+    if request.method == "POST":
+        track.delete()
+        return redirect("profile")
+    # можно сделать confirm-страницу, но для простоты редиректим назад
+    return redirect("profile")
