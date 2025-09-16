@@ -68,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1) Готовим бандл: ОБЯЗАТЕЛЬНО требуем nginx.conf, иначе ранний фейл
+      # 1) Собираем бандл: берём compose и nginx.conf из твоей структуры
       - name: Prepare deploy bundle
         run: |
           set -euo pipefail
@@ -84,14 +84,17 @@ jobs:
             echo "ERROR: docker-compose.prod.yml not found in repo root or docker/"; exit 1
           fi
 
-          # nginx.conf: корень nginx/ или docker/nginx/
-          if [ -f "nginx/nginx.conf" ]; then
-            cp "nginx/nginx.conf" "deploy_bundle/nginx/nginx.conf"
+          # nginx.conf: учитываем твою реальную раскладку (docker/nginx.conf)
+          if [ -f "docker/nginx.conf" ]; then
+            SRC_NGINX="docker/nginx.conf"
+          elif [ -f "nginx/nginx.conf" ]; then
+            SRC_NGINX="nginx/nginx.conf"
           elif [ -f "docker/nginx/nginx.conf" ]; then
-            cp "docker/nginx/nginx.conf" "deploy_bundle/nginx/nginx.conf"
+            SRC_NGINX="docker/nginx/nginx.conf"
           else
-            echo "ERROR: nginx/nginx.conf not found (expected at nginx/nginx.conf or docker/nginx/nginx.conf)"; exit 1
+            echo "ERROR: nginx.conf not found (expected docker/nginx.conf or nginx/nginx.conf)"; exit 1
           fi
+          cp "$SRC_NGINX" "deploy_bundle/nginx/nginx.conf"
 
           echo "== bundle tree =="
           find deploy_bundle -maxdepth 3 -type f -print
@@ -108,7 +111,7 @@ jobs:
             set -e
             mkdir -p /root/neptone/docker/nginx
 
-      # 3) Копируем КОНКРЕТНЫЕ ФАЙЛЫ и срезаем префикс deploy_bundle/
+      # 3) Копируем файлы и срезаем префикс deploy_bundle/
       - name: Upload deploy bundle via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -153,7 +156,7 @@ jobs:
 
             echo "== ls =="
             ls -la
-            [ -f nginx/nginx.conf ] && echo "nginx.conf present" || (echo "nginx.conf MISSING"; exit 1)
+            [ -f nginx/nginx.conf ] || (echo "nginx.conf MISSING"; exit 1)
             [ -f docker-compose.prod.yml ] || (echo "docker-compose.prod.yml MISSING"; exit 1)
 
             # Нормализация и валидация
