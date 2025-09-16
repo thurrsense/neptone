@@ -129,43 +129,36 @@ jobs:
             IMAGE=$IMAGE
             ENVV
 
-            # sanity-check
             [ -f docker-compose.prod.yml ] || (echo "docker-compose.prod.yml MISSING"; exit 1)
             [ -f nginx.conf ] || (echo "nginx.conf MISSING"; exit 1)
-            grep -qE '^IMAGE=.+$' .env || (echo "IMAGE missing in .env"; exit 1)
 
-            # нормализация (на всякий случай)
-            sed -i '1s/^\xEF\xBB\xBF//' docker-compose.prod.yml || true
-            sed -i 's/\r$//' docker-compose.prod.yml || true
-            sed -i 's/\t/  /g' docker-compose.prod.yml || true
-
-            # логины
+            # login
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
               echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin || true
             fi
 
-            # подтянуть образы и поднять БД
-            docker compose --env-file .env -f docker-compose.prod.yml pull
-            docker compose --env-file .env -f docker-compose.prod.yml up -d db
+            # алиас для единообразия
+            COMPOSE='docker compose --env-file .env -f docker-compose.prod.yml'
 
-            # дождаться готовности БД
+            $COMPOSE pull
+            $COMPOSE up -d db
+
+            # ждём БД
             for i in $(seq 1 30); do
               docker compose -f docker-compose.prod.yml exec -T db bash -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' && break || sleep 2
             done
 
-            # миграции и статика одноразово (без гонок старта web)
-            docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps web python manage.py migrate --noinput
-            docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps web python manage.py collectstatic --noinput
+            # миграции и статика одноразово
+            $COMPOSE run --rm --no-deps web python manage.py migrate --noinput
+            $COMPOSE run --rm --no-deps web python manage.py collectstatic --noinput
 
             # запуск web и nginx
-            docker compose --env-file .env -f docker-compose.prod.yml up -d web nginx
+            $COMPOSE up -d web nginx
 
-            # быстрая проверка upstream
-            docker compose exec -T nginx sh -lc 'apk add -q busybox-extras curl || true; nc -zv web 8000; curl -sI http://web:8000/ | head -n1'
+            # проверка upstream (ТЕПЕРЬ с -f)
+            $COMPOSE exec -T nginx sh -lc 'apk add -q busybox-extras curl || true; nc -zv web 8000; curl -sI http://web:8000/ | head -n1'
 
-            # лёгкая уборка
-            docker system prune -f
 
       - name: Verify files on server
         uses: appleboy/ssh-action@v1.2.0
