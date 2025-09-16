@@ -41,7 +41,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - web_static:/app/staticfiles:ro     # <-- тот же том
       - web_media:/app/media:ro            # <-- тот же том
     restart: always
