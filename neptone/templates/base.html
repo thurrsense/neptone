@@ -5,13 +5,94 @@
 <head>
     <meta charset="utf-8">
     <title>{% block title %}NEPTONE{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Favicon -->
+    <link rel="icon" href="{% static 'images/favicon.svg' %}" type="image/svg+xml">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Turbo: сохраняет плеер между переходами -->
+    <script src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.4/dist/turbo.es2017-umd.js" defer></script>
+
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 720px;
+            margin: 2rem auto;
+            padding: 0 1rem 64px
+        }
+
+        /* низ под плеер */
+        .card-soft {
+            border: 1px solid #e9ecef;
+            border-radius: 14px
+        }
+
+        .btn-brand {
+            background: #111;
+            color: #fff;
+            border-radius: 10px
+        }
+
+        .btn-brand:hover {
+            opacity: .9;
+            color: #fff
+        }
+
+        /* Аудиоплеер снизу */
+        .player-bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #111;
+            color: #fff;
+            display: flex;
+            gap: .75rem;
+            align-items: center;
+            padding: .6rem 1rem;
+            border-top: 1px solid #222;
+            z-index: 1050
+        }
+
+        .player-bar .meta {
+            min-width: 0;
+            flex: 1
+        }
+
+        .player-bar .meta .title {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .player-bar button {
+            background: #1db954;
+            color: #000;
+            border: 0;
+            border-radius: .5rem;
+            padding: .45rem .8rem;
+            cursor: pointer
+        }
+
+        .player-bar input[type=range] {
+            width: 240px
+        }
+    </style>
+
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+
+    <!-- Навбар (был ошибочно в <head>) -->
     <nav class="navbar navbar-light bg-white border-bottom fixed-top w-100 shadow-sm">
         <div class="d-flex align-items-center justify-content-between w-100 px-4">
-
-            <!-- Лого -->
             <a class="navbar-brand fw-bold me-3" href="{% url 'home' %}">NEPTONE</a>
 
-            <!-- Кнопки -->
             {% if user.is_authenticated %}
             <div class="d-flex align-items-center gap-2 flex-shrink-0">
                 <a class="btn btn-sm btn-outline-dark" href="{% url 'my_profile' %}">My Profile</a>
@@ -29,59 +110,37 @@
             </div>
             {% endif %}
 
-            <!-- Поиск (справа, тянется) -->
             <form class="ms-auto" action="{% url 'home' %}" method="get" style="max-width:320px; flex-grow:1;">
                 <input name="q" class="form-control" placeholder="Search">
             </form>
-
         </div>
     </nav>
     <div style="height:60px;"></div>
-
-    <!-- favicon -->
-    <link rel="icon" href="{% static 'images/favicon.svg' %}" type="image/svg+xml">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <!-- Bootstrap CSS (внутри <head>) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <style>
-        body {
-            font-family: system-ui, sans-serif;
-            max-width: 720px;
-            margin: 2rem auto;
-            padding: 0 1rem
-        }
-
-        .card-soft {
-            border: 1px solid #e9ecef;
-            border-radius: 14px;
-        }
-
-        .btn-brand {
-            background: #111;
-            color: #fff;
-            border-radius: 10px;
-        }
-
-        .btn-brand:hover {
-            opacity: .9;
-            color: #fff;
-        }
-    </style>
-
-    {% block extra_head %}{% endblock %}
-</head>
-
-<body>
 
     <main class="container py-4">
         {% block content %}{% endblock %}
     </main>
 
+    <!-- Плеер: сохраняется между переходами -->
+    <div id="audio-player-root" data-turbo-permanent>
+        <div class="player-bar" hidden>
+            <button id="ap-play">▶</button>
+            <button id="ap-pause" hidden>⏸</button>
+            <div class="meta">
+                <div class="title" id="ap-title">—</div>
+                <div><span id="ap-cur">0:00</span> / <span id="ap-dur">0:00</span></div>
+            </div>
+            <input id="ap-seek" type="range" min="0" max="100" value="0" step="0.1">
+            <audio id="ap-audio" preload="metadata" crossorigin="anonymous"></audio>
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Логика плеера -->
+    <script src="{% static 'js/player.js' %}" defer></script>
+
     {% block extra_js %}{% endblock %}
 </body>
 
