@@ -1,80 +1,71 @@
 {% extends "base.html" %}
+{% load widget_tweaks %}
 {% load static %}
-
-{% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/artist.css' %}">
-{% endblock %}
-
+{% block extra_head %}{% endblock %}
 {% block content %}
-
 <section class="artist-hero">
-    <!-- фон на всю ширину вьюпорта -->
-    <div class="hero-bg" aria-hidden="true">
-        {# если позже добавишь header_image в User — можно раскомментить #}
-        {# {% if artist.header_image %}<img src="{{ artist.header_image.url }}" class="cover-img">{% endif %} #}
-    </div>
-
-    <!-- контент в сетке: слева аватар+текст, справа кнопки -->
-    <div class="artist-hero-content container-xxl">
-        <div class="hero-left">
-            <div class="avatar-xl">
-                {% if artist.avatar %}
-                <img src="{{ artist.avatar.url }}" alt="{{ artist.username }}"
-                    onerror="this.onerror=null;this.src='{% static 'images/avatar-default.png' %}'">
-                {% else %}
-                <img src="{% static 'images/avatar-default.png' %}" alt="{{ artist.username }}">
-                {% endif %}
-            </div>
-
-            <div class="hero-text">
-                <h1 class="artist-name">{{ artist.username }}</h1>
-
-                <div class="hero-stats">
-                    <div class="stat">
-                        <span class="stat-val">{{ tracks|length }}</span>
-                        <span class="stat-label">Tracks</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-val">{{ artist.followers_count }}</span>
-                        <span class="stat-label">Followers</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-val">{{ artist.following_count }}</span>
-                        <span class="stat-label">Following</span>
-                    </div>
-                </div>
-            </div>
+  <div class="hero-bg" aria-hidden="true"></div>
+  <div class="artist-hero-content container-np">
+    <div class="d-flex align-items-end gap-3">
+      <div class="avatar-xl">
+        {% if artist.avatar %}
+        <img src="{{ artist.avatar.url }}" alt="{{ artist.username }}"
+          onerror="this.onerror=null;this.src='{% static 'images/avatar-default.png' %}'">
+        {% else %}
+        <img src="{% static 'images/avatar-default.png' %}" alt="{{ artist.username }}">
+        {% endif %}
+      </div>
+      <div class="hero-text">
+        <h1 class="artist-name h3 m-0">{{ artist.username }}</h1>
+        <div class="hero-stats mt-1">
+          <div class="stat"><span class="stat-val">{{ tracks|length }}</span> <span class="stat-label">Tracks</span>
+          </div>
+          <div class="stat"><span class="stat-val">{{ artist.followers_count }}</span> <span
+              class="stat-label">Followers</span></div>
+          <div class="stat"><span class="stat-val">{{ artist.following_count }}</span> <span
+              class="stat-label">Following</span></div>
         </div>
-
-        <div class="hero-actions">
-            {% if user.is_authenticated and user != artist %}
-            <form method="post" action="{% url 'follow_toggle' artist.username %}">
-                {% csrf_token %}
-                {% if is_following %}
-                <button class="btn btn-sm btn-ghost">Unfollow</button>
-                {% else %}
-                <button class="btn btn-sm btn-solid">Follow</button>
-                {% endif %}
-            </form>
-            {% endif %}
-            <a class="btn btn-sm btn-ghost" href="#">Share</a>
-            <a class="btn btn-sm btn-ghost" href="{% url 'settings_profile' %}">Edit</a>
-        </div>
+      </div>
     </div>
+    <div class="d-flex align-items-center gap-2">
+      {% if user.is_authenticated and user != artist %}
+      <form method="post" action="{% url 'follow_toggle' artist.username %}">{% csrf_token %}
+        {% if is_following %}<button class="btn-np">Unfollow</button>{% else %}
+        <button class="btn-np primary">Follow</button>{% endif %}
+      </form>
+      {% endif %}
+      <a class="btn-np" href="#">Share</a>
+      <a class="btn-np" href="{% url 'settings_profile' %}">Edit</a>
+    </div>
+  </div>
 </section>
 
-<!-- Лента треков -->
-<div class="page-wrap container-xxl">
-    <h5 class="section-title mt-3">Tracks</h5>
-    <section class="feed">
-        {% if tracks %}
-        {% for t in tracks %}
-        {# твой вывод трека как раньше #}
-        {% endfor %}
+<div class="container-np">
+  <h5 class="section-title mt-3">Tracks</h5>
+  <section class="feed vstack gap-3">
+    {% if tracks %}
+    {% for t in tracks %}
+    <div class="card-np p-3">
+      <div class="d-flex align-items-center gap-3 mb-2">
+        {% if t.cover %}
+        <img src="{{ t.cover.url }}" class="rounded" style="width:52px;height:52px;object-fit:cover">
         {% else %}
-        <div class="empty">Пока нет публичных треков. Будьте первым, загрузите что-нибудь!</div>
+        <div class="rounded" style="width:52px;height:52px;background:#2b3c97"></div>
         {% endif %}
-    </section>
+        <div class="flex-grow-1">
+          <div class="fw-medium">{{ t.title }}</div>
+          <div class="text-muted-np small">{{ t.created_at|date:"Y-m-d H:i" }}</div>
+        </div>
+        <a href="{{ t.audio.url }}" class="btn-np primary js-track" data-src="{{ t.audio.url }}"
+          data-title="{{ t.title|escape }}" data-artist="{{ artist.username|escape }}"
+          data-cover="{% if t.cover %}{{ t.cover.url }}{% endif %}">▶</a>
+        <a class="btn-np" href="{{ t.audio.url }}" download>↓</a>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="text-muted-np">Пока нет публичных треков. Будьте первым, загрузите что-нибудь!</div>
+    {% endif %}
+  </section>
 </div>
-
 {% endblock %}
