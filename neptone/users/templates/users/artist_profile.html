@@ -3,8 +3,11 @@
 {% load static %}
 {% block extra_head %}{% endblock %}
 {% block content %}
+
 <section class="artist-hero">
-  <div class="hero-bg" aria-hidden="true"></div>
+    <div class="hero-bg" aria-hidden="true">
+
+    </div>
   <div class="artist-hero-content container-np">
     <div class="d-flex align-items-end gap-3">
       <div class="avatar-xl">
@@ -25,22 +28,30 @@
           <div class="stat"><span class="stat-val">{{ artist.following_count }}</span> <span
               class="stat-label">Following</span></div>
         </div>
+        
       </div>
+      
     </div>
     <div class="d-flex align-items-center gap-2">
       {% if user.is_authenticated and user != artist %}
       <form method="post" action="{% url 'follow_toggle' artist.username %}">{% csrf_token %}
-        {% if is_following %}<button class="btn-np">Unfollow</button>{% else %}
-        <button class="btn-np primary">Follow</button>{% endif %}
+        {% if is_following %}
+            <button class="btn-np">Unfollow</button>
+        {% else %}
+            <button class="btn-np primary">Follow</button>
+        {% endif %}
+        
       </form>
       {% endif %}
-      <a class="btn-np" href="#">Share</a>
-      <a class="btn-np" href="{% url 'settings_profile' %}">Edit</a>
+      <div class="buttons-wrapper">
+        <a class="btn-np profle-button" href="#">Share</a>
+        <a class="btn-np" href="{% url 'settings_profile' %}">Edit</a>
+    </div>
     </div>
   </div>
 </section>
 
-<div class="container-np">
+<div class="container-np tracks-div">
   <h5 class="section-title mt-3">Tracks</h5>
   <section class="feed vstack gap-3">
     {% if tracks %}
