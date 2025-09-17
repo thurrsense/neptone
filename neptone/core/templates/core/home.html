@@ -20,23 +20,25 @@
             <div>
                 <div class="fw-medium m-0">{{ t.title }}</div>
                 <div class="text-muted small">
-                    <a href="{% url 'artist_profile' t.owner.username %}" class="text-decoration-none">{{
-                        t.owner.username }}</a>
-                    · {{ t.created_at|date:"Y-m-d H:i" }}
+                    <a href="{% url 'artist_profile' t.owner.username %}" class="text-decoration-none">
+                        {{ t.owner.username }}
+                    </a> · {{ t.created_at|date:"Y-m-d H:i" }}
                 </div>
             </div>
         </div>
 
         {% if t.cover %}
-        <img src="{{ t.cover.url }}" class="mb-2" style="max-width:100%;height:auto;">
+        <img src="{{ t.cover.url }}" class="mb-2 rounded" style="max-width:100%;height:auto;">
         {% endif %}
 
-        <audio controls style="width:100%;">
-            <source src="{{ t.audio.url }}" type="audio/mpeg">
-            <source src="{{ t.audio.url }}" type="audio/wav">
-            <source src="{{ t.audio.url }}" type="audio/ogg">
-            Ваш браузер не поддерживает воспроизведение аудио.
-        </audio>
+        <!-- Триггер глобального плеера (вместо <audio>) -->
+        <a href="{{ t.audio.url }}" class="btn btn-dark js-track" data-src="{{ t.audio.url }}"
+            data-title="{{ t.title|escape }}" data-artist="{{ t.owner.username|escape }}"
+            data-cover="{% if t.cover %}{{ t.cover.url }}{% endif %}">
+            ▶ Play
+        </a>
+
+        <a class="btn btn-outline-secondary ms-2" href="{{ t.audio.url }}" download>Download</a>
     </div>
     {% endfor %}
 </div>
@@ -47,8 +49,9 @@
         {% if page_obj.has_previous %}
         <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Назад</a></li>
         {% endif %}
-        <li class="page-item disabled"><span class="page-link">Стр. {{ page_obj.number }} из {{
-                page_obj.paginator.num_pages }}</span></li>
+        <li class="page-item disabled">
+            <span class="page-link">Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        </li>
         {% if page_obj.has_next %}
         <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Вперёд</a></li>
         {% endif %}
@@ -58,4 +61,5 @@
 {% else %}
 <div class="text-muted">Пока нет публичных треков. Будьте первым, загрузите что-нибудь!</div>
 {% endif %}
+
 {% endblock %}

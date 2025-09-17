@@ -1,85 +1,122 @@
 {% load static %}
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 
 <head>
     <meta charset="utf-8">
     <title>{% block title %}NEPTONE{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Favicon -->
     <link rel="icon" href="{% static 'images/favicon.svg' %}" type="image/svg+xml">
-
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Turbo: сохраняет плеер между переходами -->
+    <!-- Turbo для «живой» навигации -->
     <script src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.4/dist/turbo.es2017-umd.js" defer></script>
+    <!-- WaveSurfer (волна как у SC) -->
+    <script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/wavesurfer.min.js" defer></script>
 
     <style>
         body {
-            font-family: system-ui, sans-serif;
-            max-width: 720px;
-            margin: 2rem auto;
-            padding: 0 1rem 64px
+            padding-bottom: 88px;
+            font-family: system-ui, sans-serif
         }
 
-        /* низ под плеер */
-        .card-soft {
-            border: 1px solid #e9ecef;
-            border-radius: 14px
-        }
-
-        .btn-brand {
-            background: #111;
-            color: #fff;
-            border-radius: 10px
-        }
-
-        .btn-brand:hover {
-            opacity: .9;
-            color: #fff
-        }
-
-        /* Аудиоплеер снизу */
-        .player-bar {
+        .player {
             position: fixed;
             left: 0;
             right: 0;
             bottom: 0;
-            background: #111;
+            background: #0f0f10;
             color: #fff;
-            display: flex;
-            gap: .75rem;
+            z-index: 1050;
+            border-top: 1px solid #222
+        }
+
+        .player .inner {
+            display: grid;
+            grid-template-columns: 56px 1fr auto;
+            gap: 14px;
             align-items: center;
-            padding: .6rem 1rem;
-            border-top: 1px solid #222;
-            z-index: 1050
+            padding: 10px 14px;
+            max-width: 1100px;
+            margin: 0 auto
         }
 
-        .player-bar .meta {
-            min-width: 0;
-            flex: 1
+        .player img {
+            width: 56px;
+            height: 56px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #222
         }
 
-        .player-bar .meta .title {
+        .player .meta {
+            min-width: 0
+        }
+
+        .player .title {
             font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis
         }
 
-        .player-bar button {
-            background: #1db954;
-            color: #000;
-            border: 0;
-            border-radius: .5rem;
-            padding: .45rem .8rem;
-            cursor: pointer
+        .player .artist {
+            opacity: .7;
+            font-size: .9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
         }
 
-        .player-bar input[type=range] {
-            width: 240px
+        .player .controls {
+            display: flex;
+            align-items: center;
+            gap: .5rem
+        }
+
+        .player .btnc {
+            background: #1db954;
+            border: 0;
+            color: #000;
+            border-radius: 999px;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center
+        }
+
+        .player .btns {
+            display: flex;
+            align-items: center;
+            gap: .5rem
+        }
+
+        #ap-wave {
+            height: 44px
+        }
+
+        .player .right {
+            display: flex;
+            align-items: center;
+            gap: .75rem
+        }
+
+        .player input[type=range] {
+            width: 140px
+        }
+
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0
+        }
+
+        main {
+            max-width: 900px;
+            margin: 80px auto 0;
+            padding: 0 16px
         }
     </style>
 
@@ -88,23 +125,22 @@
 
 <body>
 
-    <!-- Навбар (был ошибочно в <head>) -->
-    <nav class="navbar navbar-light bg-white border-bottom fixed-top w-100 shadow-sm">
+    <!-- Навбар -->
+    <nav class="navbar navbar-light bg-white border-bottom shadow-sm">
         <div class="d-flex align-items-center justify-content-between w-100 px-4">
             <a class="navbar-brand fw-bold me-3" href="{% url 'home' %}">NEPTONE</a>
 
             {% if user.is_authenticated %}
-            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <div class="d-flex align-items-center gap-2">
                 <a class="btn btn-sm btn-outline-dark" href="{% url 'my_profile' %}">My Profile</a>
                 <a class="btn btn-sm btn-outline-dark" href="{% url 'settings_profile' %}">Settings</a>
-                <form method="post" action="{% url 'logout' %}" class="d-inline">
-                    {% csrf_token %}
+                <form method="post" action="{% url 'logout' %}" class="d-inline">{% csrf_token %}
                     <button class="btn btn-sm btn-outline-secondary">Logout</button>
                 </form>
                 <a class="btn btn-sm btn-dark" href="{% url 'settings_profile' %}#upload">Upload</a>
             </div>
             {% else %}
-            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <div class="d-flex align-items-center gap-2">
                 <a class="btn btn-sm btn-dark" href="{% url 'login' %}">Login</a>
                 <a class="btn btn-sm btn-outline-dark" href="{% url 'register' %}">Sign up</a>
             </div>
@@ -115,32 +151,35 @@
             </form>
         </div>
     </nav>
-    <div style="height:60px;"></div>
 
-    <main class="container py-4">
-        {% block content %}{% endblock %}
-    </main>
+    <main>{% block content %}{% endblock %}</main>
 
-    <!-- Плеер: сохраняется между переходами -->
-    <div id="audio-player-root" data-turbo-permanent>
-        <div class="player-bar" hidden>
-            <button id="ap-play">▶</button>
-            <button id="ap-pause" hidden>⏸</button>
-            <div class="meta">
-                <div class="title" id="ap-title">—</div>
-                <div><span id="ap-cur">0:00</span> / <span id="ap-dur">0:00</span></div>
+    <!-- Глобальный плеер (переживает переходы) -->
+    <div id="ap-root" data-turbo-permanent>
+        <div class="player" id="ap" hidden>
+            <div class="inner">
+                <img id="ap-cover" alt="">
+                <div class="meta">
+                    <div class="title" id="ap-title">—</div>
+                    <div class="artist" id="ap-artist">—</div>
+                    <div id="ap-wave"></div>
+                </div>
+                <div class="right">
+                    <div class="btns">
+                        <button class="btn btn-sm btn-outline-light" id="ap-prev">⏮</button>
+                        <button class="btnc" id="ap-play">▶</button>
+                        <button class="btnc" id="ap-pause" hidden>⏸</button>
+                        <button class="btn btn-sm btn-outline-light" id="ap-next">⏭</button>
+                    </div>
+                    <div id="ap-time" class="text-white-50 small">0:00 / 0:00</div>
+                    <input id="ap-vol" type="range" min="0" max="1" step="0.01" value="1">
+                </div>
             </div>
-            <input id="ap-seek" type="range" min="0" max="100" value="0" step="0.1">
-            <audio id="ap-audio" preload="metadata" crossorigin="anonymous"></audio>
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
-    <!-- Логика плеера -->
     <script src="{% static 'js/player.js' %}" defer></script>
-
     {% block extra_js %}{% endblock %}
 </body>
 

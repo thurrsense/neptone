@@ -1,77 +1,136 @@
 (() => {
-    const $ = (sel, el = document) => el.querySelector(sel);
-    const bar = $('.player-bar');
-    const audio = $('#ap-audio');
-    const playBtn = $('#ap-play');
-    const pauseBtn = $('#ap-pause');
-    const seek = $('#ap-seek');
-    const cur = $('#ap-cur'), dur = $('#ap-dur');
-    const titleEl = $('#ap-title');
+    const $ = (s, el = document) => el.querySelector(s);
+    const ap = $('#ap'), waveEl = $('#ap-wave');
+    const titleEl = $('#ap-title'), artistEl = $('#ap-artist'), coverEl = $('#ap-cover');
+    const playBtn = $('#ap-play'), pauseBtn = $('#ap-pause'), prevBtn = $('#ap-prev'), nextBtn = $('#ap-next');
+    const timeEl = $('#ap-time'), vol = $('#ap-vol');
 
-    let state = { src: null, title: '', t: 0 };
+    let ws; // WaveSurfer
+    let queue = [];    // [{src,title,artist,cover}]
+    let idx = -1;
+    let restoreOnce = false;
 
-    function fmt(t) { t = Math.floor(t || 0); const m = Math.floor(t / 60), s = (t % 60).toString().padStart(2, '0'); return `${m}:${s}` }
+    const fmt = t => {
+        t = Math.max(0, Math.floor(t || 0));
+        const m = (t / 60 | 0), s = String(t % 60).padStart(2, '0');
+        return `${m}:${s}`;
+    };
 
-    function load({ src, title, startAt = 0 }) {
-        if (!src) return;
-        if (state.src !== src) { audio.src = src; }
-        state = { src, title, t: startAt || 0 };
-        titleEl.textContent = title || '—';
-        bar.hidden = false;
-        audio.currentTime = state.t;
-        audio.play().catch(() => { }); // автоплей может блокироваться до первого клика
-        save();
-        updateButtons();
+    function ensureWS() {
+        if (ws) return ws;
+        ws = WaveSurfer.create({
+            container: waveEl,
+            height: 44,
+            waveColor: '#888',
+            progressColor: '#1db954',
+            cursorColor: '#ccc',
+            barWidth: 2,
+            barGap: 1,
+            responsive: true,
+            normalize: true,
+            partialRender: true,
+        });
+        ws.on('ready', () => {
+            ap.hidden = false;
+            updateButtons();
+            updateTime();
+        });
+        ws.on('play', updateButtons);
+        ws.on('pause', updateButtons);
+        ws.on('audioprocess', updateTime);
+        ws.on('seek', updateTime);
+        ws.on('finish', () => next());
+        return ws;
     }
 
-    function save() { try { localStorage.setItem('ap_state', JSON.stringify({ src: state.src, title: state.title, t: audio.currentTime || 0 })) } catch (e) { } }
-    function restore() {
-        try {
-            const s = JSON.parse(localStorage.getItem('ap_state') || 'null');
-            if (s && s.src) { load({ src: s.src, title: s.title, startAt: s.t }); }
-        } catch (e) { }
+    function loadTrack(i) {
+        if (i < 0 || i >= queue.length) return;
+        idx = i;
+        const t = queue[idx];
+        titleEl.textContent = t.title || '—';
+        artistEl.textContent = t.artist || '';
+        coverEl.src = t.cover || '';
+        const w = ensureWS();
+        w.load(t.src);
+        saveState();
     }
+
+    function play() { ensureWS().play(); }
+    function pause() { ws && ws.pause(); }
+    function prev() { if (queue.length) loadTrack((idx - 1 + queue.length) % queue.length); play(); }
+    function next() { if (queue.length) loadTrack((idx + 1) % queue.length); play(); }
 
     function updateButtons() {
-        if (audio.paused) { playBtn.hidden = false; pauseBtn.hidden = true; }
-        else { playBtn.hidden = true; pauseBtn.hidden = false; }
+        const playing = ws && ws.isPlaying();
+        playBtn.hidden = !!playing;
+        pauseBtn.hidden = !playing;
+    }
+    function updateTime() {
+        const dur = ws?.getDuration() || 0;
+        const cur = ws?.getCurrentTime() || 0;
+        timeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
     }
 
-    audio.addEventListener('loadedmetadata', () => { dur.textContent = fmt(audio.duration); });
-    audio.addEventListener('timeupdate', () => {
-        cur.textContent = fmt(audio.currentTime);
-        if (audio.duration) seek.value = (audio.currentTime / audio.duration) * 100;
-    });
-    audio.addEventListener('pause', updateButtons);
-    audio.addEventListener('play', updateButtons);
-    audio.addEventListener('ended', () => { updateButtons(); });
+    function buildQueue(fromEl) {
+        // Собираем все элементы .js-track в текущем документе в порядке отображения
+        const nodes = Array.from(document.querySelectorAll('.js-track'));
+        queue = nodes.map(n => ({
+            src: n.dataset.src,
+            title: n.dataset.title || n.dataset.artist ? `${n.dataset.artist} — ${n.dataset.title}` : n.dataset.title,
+            artist: n.dataset.artist || '',
+            cover: n.dataset.cover || ''
+        }));
+        return nodes.indexOf(fromEl);
+    }
 
-    seek.addEventListener('input', () => {
-        if (audio.duration) { audio.currentTime = (seek.value / 100) * audio.duration; save(); }
-    });
-    playBtn.addEventListener('click', () => audio.play());
-    pauseBtn.addEventListener('click', () => audio.pause());
+    function saveState() {
+        try {
+            localStorage.setItem('ap_queue', JSON.stringify({ queue, idx }));
+            localStorage.setItem('ap_volume', String(vol.value));
+        } catch (_) { }
+    }
+    function restoreState() {
+        try {
+            const q = JSON.parse(localStorage.getItem('ap_queue') || 'null');
+            const v = parseFloat(localStorage.getItem('ap_volume') || '1');
+            if (q && Array.isArray(q.queue) && q.queue.length) {
+                queue = q.queue; idx = Math.min(Math.max(q.idx, 0), q.queue.length - 1);
+                vol.value = isFinite(v) ? v : 1;
+                ensureWS().setVolume(vol.value);
+                loadTrack(idx);
+            }
+        } catch (_) { }
+    }
 
-    // Глобальный делегат: клик по любому .js-play-track
+    // Handlers
+    playBtn.addEventListener('click', play);
+    pauseBtn.addEventListener('click', pause);
+    prevBtn.addEventListener('click', prev);
+    nextBtn.addEventListener('click', next);
+    vol.addEventListener('input', () => { ensureWS().setVolume(parseFloat(vol.value || '1')); saveState(); });
+
+    // Делегат по клику на карточку трека/кнопку
     document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.js-play-track');
-        if (!btn) return;
+        const el = e.target.closest('.js-track');
+        if (!el) return;
         e.preventDefault();
-        const src = btn.dataset.src; // абсолютный или относительный URL файла
-        const title = btn.dataset.title || btn.textContent.trim();
-        load({ src, title });
+        const startIdx = buildQueue(el);
+        if (startIdx >= 0) {
+            loadTrack(startIdx);
+            play();
+        }
     });
 
-    // Media Session API (красиво на телефонах/десктопе)
+    // Media Session
     if ('mediaSession' in navigator) {
-        navigator.mediaSession.setActionHandler('play', () => audio.play());
-        navigator.mediaSession.setActionHandler('pause', () => audio.pause());
-        navigator.mediaSession.metadata = new MediaMetadata({ title: 'Neptone' });
+        navigator.mediaSession.setActionHandler('play', play);
+        navigator.mediaSession.setActionHandler('pause', pause);
+        navigator.mediaSession.setActionHandler('previoustrack', prev);
+        navigator.mediaSession.setActionHandler('nexttrack', next);
     }
 
-    // Сохраняем состояние при навигации Turbo
-    document.addEventListener('turbo:before-cache', save);
-    document.addEventListener('turbo:load', () => updateButtons());
-
-    restore();
+    // Turbo — одно восстановление после первой загрузки
+    document.addEventListener('turbo:load', () => {
+        if (!restoreOnce) { restoreState(); restoreOnce = true; }
+    });
 })();
