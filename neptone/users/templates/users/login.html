@@ -5,6 +5,11 @@
 <div class="container-np" style="max-width:480px">
   <div class="card-np p-4">
     <h1 class="h4 mb-3">Вход</h1>
+    {% if messages %}
+      {% for m in messages %}
+        <div class="alert alert-{{ m.tags }}">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
     <form method="post" novalidate>
       {% csrf_token %}
       {{ form.non_field_errors }}
