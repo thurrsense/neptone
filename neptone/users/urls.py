@@ -6,18 +6,20 @@ from django.contrib.auth.views import (
 )
 from .views import TOTPSetupView, TOTPVerifyView, TOTPLoginView
 from .views import (
-    register,
-    settings_profile,
-    artist_profile,
-    my_profile_redirect,
-    deactivate_sessions,
-    delete_account,
-    delete_my_track,
-    follow_toggle,
+    TwoFactorLoginView, 
+    TOTPSetupPageView, 
+    TOTPDisableView,
+    twofactor_verify, 
+    TOTPSetupView, 
+    TOTPVerifyView, 
+    TOTPLoginView,
+    register, settings_profile, artist_profile, my_profile_redirect,
+    deactivate_sessions, delete_account, delete_my_track, follow_toggle,
 )
 
 urlpatterns = [
-    path("login/",  LoginView.as_view(template_name="users/login.html"), name="login"),
+    path("login/", TwoFactorLoginView.as_view(), name="login"),  # <-- наш LoginView
+    path("login/verify/", twofactor_verify, name="twofactor_verify"),  # страница ввода OTP после пароля
     path("logout/", LogoutView.as_view(next_page="home"), name="logout"),
     path("register/", register, name="register"),
 
@@ -44,6 +46,10 @@ urlpatterns = [
 
     path("u/<str:username>/follow-toggle/",
          follow_toggle, name="follow_toggle"),
+
+    # settings 2FA pages
+    path("settings/2fa/setup/", TOTPSetupPageView.as_view(), name="settings_2fa_setup"),
+    path("settings/2fa/disable/", TOTPDisableView, name="settings_2fa_disable"),
 
     # API endpoints (2FA/JWT)
     path("api/2fa/setup/",  TOTPSetupView.as_view(),  name="2fa_setup"),

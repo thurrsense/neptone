@@ -47,6 +47,21 @@
       </form>
     </div>
 
+    <div class="card-np p-4 mb-4">
+      <h2 class="h5 mb-3">Двухфакторная аутентификация (2FA)</h2>
+    
+      {% if request.user.otp_enabled %}
+        <p>2FA включена ✅</p>
+        <form method="post" action="{% url 'settings_2fa_disable' %}">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-outline-danger" type="submit">Отключить 2FA</button>
+        </form>
+      {% else %}
+        <p>2FA не включена</p>
+        <a class="btn-np primary" href="{% url 'settings_2fa_setup' %}">Подключить 2FA</a>
+      {% endif %}
+    </div>
+
     <div class="card-np p-4 mb-4" id="upload">
       <h2 class="h5 mb-3">Upload трека</h2>
       <form method="post" enctype="multipart/form-data">
