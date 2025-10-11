@@ -23,6 +23,139 @@ from tracks.forms import TrackForm
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.contrib.sessions.models import Session
+from django.views import View
+from django import forms
+from django.contrib.auth import authenticate, login as auth_login
+from django.urls import reverse
+from django.http import HttpResponseRedirect
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
+from django.conf import settings
+
+
+# --- Форма для ввода OTP (session flow) ---
+class OTPForm(forms.Form):
+    token = forms.CharField(max_length=6, min_length=6, widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "123456"}))
+
+
+# --- Two-step login view (session-based) ---
+class TwoFactorLoginView(View):
+    """
+    Принимает username+password. Если user.otp_enabled -> сохраняет временный user_id в сессии
+    и редиректит на /login/verify/ ; иначе — логинит и редиректит как обычно.
+    """
+    template_name = "users/login.html"
+    form_class = AuthenticationForm
+
+    def get(self, request):
+        form = self.form_class(request=request)
+        return render(request, self.template_name, {"form": form})
+
+    def post(self, request):
+        form = self.form_class(request=request, data=request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {"form": form})
+
+        # аутентифицированный user (но ещё не залогинен)
+        user = form.get_user()
+
+        if getattr(user, "otp_enabled", False):
+            # сохраним ID в сессии и перенаправим на ввод токена
+            request.session['pre_2fa_user_id'] = user.pk
+            # не логиним пользователя пока не пройдёт OTP
+            return redirect("twofactor_verify")
+        else:
+            # обычный логин
+            auth_login(request, user)
+            return redirect(settings.LOGIN_REDIRECT_URL)
+
+# --- view для ввода токена после пароля ---
+def twofactor_verify(request):
+    user_id = request.session.get('pre_2fa_user_id')
+    if not user_id:
+        return redirect("login")
+
+    user = get_object_or_404(User, pk=user_id)
+
+    if request.method == "POST":
+        form = OTPForm(request.POST)
+        if form.is_valid():
+            token = form.cleaned_data['token']
+            device = user.get_totp_device()
+            if device and device.verify_token(token):
+                # логиним (создаём сессию)
+                auth_login(request, user)
+                # удаляем временные данные безопасно
+                request.session.pop('pre_2fa_user_id', None)
+                return redirect(settings.LOGIN_REDIRECT_URL)
+            else:
+                form.add_error("token", "Неверный токен 2FA")
+    else:
+        form = OTPForm()
+
+    return render(request, "users/twofactor_verify.html", {"form": form, "user": user})
+
+
+# --- settings: страница настройки 2FA (генерация QR + ввод токена для подтверждения) ---
+@method_decorator(login_required, name='dispatch')
+class TOTPSetupPageView(View):
+    """
+    GET: генерирует устройство+QR (с помощью сериализатора TOTPSetupSerializer) и показывает QR.
+    POST: принимает token и подтверждает устройство (подобно TOTPVerifySerializer) — сохраняет флаги.
+    """
+    template_name = "users/settings_2fa_setup.html"
+
+    def get(self, request):
+        # если уже включено — ничего генерировать не надо
+        if request.user.otp_enabled:
+            return redirect("settings_profile")
+
+        from .serializers import TOTPSetupSerializer
+        serializer = TOTPSetupSerializer(data={}, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()
+        # data содержит qr_code (base64), secret, config_url
+        request.session['pending_totp_device_name'] = data.get('secret_key')  # не обязательно, но можно хранить
+        return render(request, self.template_name, {"qr": data.get('qr_code'), "config_url": data.get('config_url')})
+
+    def post(self, request):
+        token = request.POST.get('token')
+        if not token:
+            messages.error(request, "Введите токен из приложения.")
+            return redirect("settings_2fa_setup")
+
+        # ищем неподтверждённое устройство
+        try:
+            device = TOTPDevice.objects.get(user=request.user, confirmed=False)
+        except TOTPDevice.DoesNotExist:
+            messages.error(request, "Устройство не найдено. Попробуйте ещё раз.")
+            return redirect("settings_2fa_setup")
+
+        if device.verify_token(token):
+            device.confirmed = True
+            device.save()
+            request.user.otp_enabled = True
+            request.user.otp_verified = True
+            request.user.save()
+            messages.success(request, "2FA успешно включена.")
+            return redirect("settings_profile")
+        else:
+            messages.error(request, "Неверный токен.")
+            return redirect("settings_2fa_setup")
+        
+        
+# --- отключение 2FA ---
+@login_required
+def TOTPDisableView(request):
+    if request.method == "POST":
+        # удаляем все TOTP устройства у пользователя и снимаем флаги
+        TOTPDevice.objects.filter(user=request.user).delete()
+        request.user.otp_enabled = False
+        request.user.otp_verified = False
+        request.user.save()
+        messages.success(request, "2FA отключена.")
+    return redirect("settings_profile")
 
 
 class TOTPSetupView(APIView):

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+{% block title %}Настройка 2FA · NEPTONE{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12 col-lg-8">
+    <div class="card-np p-4 mb-4">
+      <h2 class="h5 mb-3">Настройка 2FA (TOTP)</h2>
+
+      <p>Отсканируйте QR-код в приложении-генераторе (Google Authenticator, Authy и т.п.)</p>
+
+      <div class="mb-3 text-center">
+        {% if qr %}
+          <img src="{{ qr }}" alt="QR code for TOTP" style="max-width:240px;"/>
+        {% endif %}
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-2">
+          <label class="form-label">Код из приложения</label>
+          <input class="input-np" name="token" placeholder="123456" />
+        </div>
+        <button class="btn-np primary" type="submit">Подтвердить и включить 2FA</button>
+        <a class="btn-np ms-2" href="{% url 'settings_profile' %}">Отмена</a>
+      </form>
+
+      <div class="form-help mt-3">Если код не принимается — пересоздайте устройство или проверьте время на телефоне.</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
