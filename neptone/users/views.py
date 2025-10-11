@@ -85,7 +85,7 @@ def twofactor_verify(request):
             device = user.get_totp_device()
             if device and device.verify_token(token):
                 # логиним (создаём сессию)
-                auth_login(request, user)
+                auth_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
                 # удаляем временные данные безопасно
                 request.session.pop('pre_2fa_user_id', None)
                 return redirect(settings.LOGIN_REDIRECT_URL)

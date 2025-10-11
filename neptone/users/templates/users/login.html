@@ -27,6 +27,17 @@
       </div>
 
       <button class="btn-np primary w-100" type="submit">Войти</button>
+
+      <hr class="my-3">
+      <p class="text-center mb-2">Или войдите через:</p>
+      <div class="d-flex justify-content-center gap-2">
+        <a href="{% url 'social:begin' 'google-oauth2' %}" class="btn-np outline">
+          <img src="/static/icons/google.svg" width="18" class="me-1"> Google
+        </a>
+        <a href="{% url 'social:begin' 'yandex-oauth2' %}" class="btn-np outline">
+          <img src="/static/icons/yandex.svg" width="18" class="me-1"> Yandex
+        </a>
+      </div>
     </form>
   </div>
 </div>

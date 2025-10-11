@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from django.contrib.auth.views import (
     LoginView, LogoutView,
     PasswordResetView, PasswordResetDoneView,
@@ -22,6 +22,8 @@ urlpatterns = [
     path("login/verify/", twofactor_verify, name="twofactor_verify"),  # страница ввода OTP после пароля
     path("logout/", LogoutView.as_view(next_page="home"), name="logout"),
     path("register/", register, name="register"),
+
+    path('oauth/', include('social_django.urls', namespace='social')),
 
     # Мой профиль -> редирект на публичную страницу себя
     path("profile/", my_profile_redirect, name="my_profile"),
