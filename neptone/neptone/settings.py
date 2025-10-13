@@ -13,7 +13,7 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 
-load_dotenv()
+#load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -198,7 +198,7 @@ LOGIN_REDIRECT_URL = 'my_profile'
 LOGOUT_REDIRECT_URL = "home"
 
 # OAuth keys (заполни через .env)
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY  = os.getenv("GOOGLE_CLIENT_ID")
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
 SOCIAL_AUTH_YANDEX_OAUTH2_KEY = os.getenv("YANDEX_CLIENT_ID")
