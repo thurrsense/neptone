@@ -7,6 +7,7 @@ from django_otp.plugins.otp_totp.models import TOTPDevice
 
 
 class User(AbstractUser):
+    display_name = models.CharField(max_length=150, blank=True) 
     bio = models.TextField(null=True, blank=True, editable=True)
     birth_date = models.DateField(null=True, blank=True, editable=True)
     otp_enabled = models.BooleanField(default=False)
@@ -18,6 +19,10 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
+    
+    @property
+    def display_or_username(self) -> str:
+        return self.display_name or self.username
 
     def get_totp_device(self):
         """Получить TOTP устройство пользователя"""
