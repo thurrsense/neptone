@@ -99,12 +99,12 @@ def twofactor_verify(request):
 
 @csrf_protect
 def social_twofactor_verify(request):
-    """
-    Страница ввода OTP для соц-логина (Google/Yandex).
-    Получает partial_token, проверяет 2FA и возобновляет pipeline.
-    """
-    # 1) Забираем partial_token и из GET, и из POST (важно для submit)
-    partial_token = request.GET.get('partial_token') or request.POST.get('partial_token')
+    # пробуем сначала из GET/POST, затем из сессии
+    partial_token = (
+        request.GET.get('partial_token')
+        or request.POST.get('partial_token')
+        or request.session.get('partial_token')
+    )
     if not partial_token:
         return HttpResponseBadRequest("Missing partial_token")
 
@@ -120,14 +120,14 @@ def social_twofactor_verify(request):
         token = (request.POST.get('token') or "").strip()
         device = user.get_totp_device()
         if device and device.verify_token(token):
-            # помечаем как пройдено — пайплайн продолжится
             request.session['social_2fa_ok'] = True
             complete_url = reverse("social:complete", args=[backend])
+            # можно подчистить partial_token из сессии
+            request.session.pop('partial_token', None)
             return redirect(f"{complete_url}?partial_token={partial_token}")
         else:
             messages.error(request, "Неверный код 2FA")
 
-    # GET — показать форму (и передать partial_token в hidden)
     return render(request, "users/social_twofactor_verify.html", {
         "partial_token": partial_token,
         "backend": backend,
