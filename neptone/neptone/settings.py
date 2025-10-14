@@ -99,7 +99,7 @@ SOCIAL_AUTH_PIPELINE = (
     'social_core.pipeline.user.get_username',
     'social_core.pipeline.user.create_user',
 
-    'social_core.pipeline.partial.save_status_to_session',
+    'users.pipeline.save_status_to_session',
     'users.pipeline.require_2fa',
 
     'social_core.pipeline.social_auth.associate_user',
