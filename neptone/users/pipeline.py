@@ -5,29 +5,22 @@ from urllib.parse import urlencode
 
 @partial
 def require_2fa(strategy, backend, user=None, *args, **kwargs):
-    """
-    Если у пользователя включена 2FA — останавливаем pipeline,
-    просим ввести OTP и потом возобновляем pipeline.
-    """
-    if not user:
+    if not user or not getattr(user, 'otp_enabled', False):
         return
 
-    if not getattr(user, 'otp_enabled', False):
-        return  # 2FA выключена — продолжаем как обычно
-
-    # Если уже прошли 2FA — чистим флаги и пропускаем дальше
+    # уже прошли 2FA — просто продолжаем
     if strategy.session_get('social_2fa_ok'):
         strategy.session_pop('social_2fa_ok', None)
         strategy.session_pop('pre_2fa_user_id', None)
         strategy.session_pop('partial_backend', None)
-        strategy.session_pop('partial_token', None)
-        strategy.session_pop('partial_pipeline', None)
         return
-    
+
+    # ставим на паузу и уводим на ввод кода
     strategy.session_set('pre_2fa_user_id', user.pk)
     strategy.session_set('partial_backend', backend.name)
 
-    return redirect(reverse('social_twofactor_verify'))
+    url = reverse('social_twofactor_verify')  # БЕЗ ручной сборки partial_token!
+    return strategy.redirect(url)             # ← ключевой момент
 
 
 def save_status_to_session(strategy, pipeline_index=None, *args, **kwargs):
