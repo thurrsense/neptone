@@ -19,7 +19,7 @@
         {% endif %}
       </div>
       <div class="hero-text">
-        <h1 class="artist-name h3 m-0">{{ artist.username }}</h1>
+        <h1 class="artist-name h3 m-0">{{ artist.display_or_username }}</h1>
         <div class="hero-stats mt-1">
           <div class="stat"><span class="stat-val">{{ tracks|length }}</span> <span class="stat-label">Tracks</span>
           </div>
@@ -68,7 +68,7 @@
           <div class="text-muted-np small">{{ t.created_at|date:"Y-m-d H:i" }}</div>
         </div>
         <a href="{{ t.audio.url }}" class="btn-np primary js-track" data-src="{{ t.audio.url }}"
-          data-title="{{ t.title|escape }}" data-artist="{{ artist.username|escape }}"
+          data-title="{{ t.title|escape }}" data-artist="{{ artist.display_or_username|escape }}"
           data-cover="{% if t.cover %}{{ t.cover.url }}{% endif %}">▶</a>
         <a class="btn-np" href="{{ t.audio.url }}" download>↓</a>
       </div>

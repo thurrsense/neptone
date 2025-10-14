@@ -12,6 +12,12 @@
         {{ form.non_field_errors }}
 
         <div class="mb-2">
+          <label class="form-label">Отображаемое имя</label>
+          {{ form.display_name|add_class:"input-np" }}
+          <div class="text-danger small">{{ form.display_name.errors }}</div>
+        </div>
+
+        <div class="mb-2">
           <label class="form-label">Email</label>
           {{ form.email|add_class:"input-np" }} <div class="text-danger small">{{ form.email.errors }}</div>
         </div>
