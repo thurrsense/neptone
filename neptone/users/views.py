@@ -24,6 +24,7 @@ from django.core.paginator import Paginator
 from django.contrib import messages
 from django.contrib.sessions.models import Session
 from django.views import View
+from django.views.decorators.csrf import csrf_protect
 from django import forms
 from django.contrib.auth import authenticate, login as auth_login
 from django.urls import reverse
@@ -89,6 +90,35 @@ def twofactor_verify(request):
                 # удаляем временные данные безопасно
                 request.session.pop('pre_2fa_user_id', None)
                 return redirect(settings.LOGIN_REDIRECT_URL)
+            else:
+                form.add_error("token", "Неверный токен 2FA")
+    else:
+        form = OTPForm()
+
+    return render(request, "users/twofactor_verify.html", {"form": form, "user": user})
+
+
+@csrf_protect
+def social_twofactor_verify(request):
+    user_id = request.session.get('pre_2fa_user_id')
+    backend = request.session.get('partial_backend')
+
+    if not user_id or not backend:
+        # Нечего проверять — отправим на обычную страницу логина
+        return redirect("login")
+
+    user = get_object_or_404(User, pk=user_id)
+
+    if request.method == "POST":
+        form = OTPForm(request.POST)
+        if form.is_valid():
+            token = form.cleaned_data['token']
+            device = user.get_totp_device()
+            if device and device.verify_token(token):
+                # отмечаем, что 2FA пройдена для соцпайплайна
+                request.session['social_2fa_ok'] = True
+                # Возобновляем social-auth pipeline:
+                return redirect('social:complete', backend=backend)
             else:
                 form.add_error("token", "Неверный токен 2FA")
     else:
