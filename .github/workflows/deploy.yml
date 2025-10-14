@@ -96,7 +96,7 @@ jobs:
           target: "/root/neptone/docker/"
           strip_components: 1  
           overwrite: true
-
+      
       - name: Upload nginx.conf via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -106,6 +106,17 @@ jobs:
           source: "docker/nginx.conf"
           target: "/root/neptone/docker/"
           strip_components: 1  
+          overwrite: true
+      
+      - name: Upload Caddyfile via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "docker/Caddyfile"
+          target: "/root/neptone/docker/"
+          strip_components: 1         
           overwrite: true
 
       # Деплой
@@ -131,6 +142,7 @@ jobs:
 
             [ -f docker-compose.prod.yml ] || (echo "docker-compose.prod.yml MISSING"; exit 1)
             [ -f nginx.conf ] || (echo "nginx.conf MISSING"; exit 1)
+            [ -f Caddyfile ] || (echo "Caddyfile MISSING"; exit 1)
 
             # login
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
@@ -154,7 +166,7 @@ jobs:
             $COMPOSE run --rm --no-deps web python manage.py collectstatic --noinput
 
             # запуск web и nginx
-            $COMPOSE up -d web nginx
+            $COMPOSE up -d web nginx caddy
 
             # проверка upstream (ТЕПЕРЬ с -f)
             $COMPOSE exec -T nginx sh -lc 'apk add -q busybox-extras curl || true; nc -zv web 8000; curl -sI http://web:8000/ | head -n1'

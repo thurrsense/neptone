@@ -1,0 +1,11 @@
+neptone.ru, www.neptone.ru {
+	# Авто-HTTPS + автопродление
+	email you@example.com
+
+	# Проксируем во внутренний Nginx
+	reverse_proxy nginx:80
+
+	# (опционально) сжать ответы
+	encode gzip
+}
+
