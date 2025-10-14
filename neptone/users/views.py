@@ -378,31 +378,44 @@ def my_profile_redirect(request):
 
 @login_required
 def settings_profile(request):
-    # Проформа
     form = ProfileForm(instance=request.user)
-    if request.method == "POST" and request.POST.get("action") == "save_profile":
-        form = ProfileForm(request.POST, request.FILES, instance=request.user)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Профиль обновлён.")
-            return redirect("settings_profile")
-
-    # Upload-форма
     upload_form = TrackForm()
-    if request.method == "POST" and request.POST.get("action") == "upload_track":
-        upload_form = TrackForm(request.POST, request.FILES)
-        if upload_form.is_valid():
-            t = upload_form.save(commit=False)
-            t.owner = request.user
-            t.save()
-            messages.success(request, "Трек загружен.")
-            return redirect("settings_profile")
+
+    if request.method == "POST":
+        # Fallback: если кнопка не передалась (нажали Enter), используем hidden action
+        is_profile_submit = (
+            "submit_profile" in request.POST
+            or request.POST.get("action") == "save_profile"
+        )
+        is_upload_submit = (
+            "submit_upload" in request.POST
+            or request.POST.get("action") == "upload_track"
+        )
+
+        if is_profile_submit:
+            form = ProfileForm(request.POST, request.FILES, instance=request.user)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "Профиль обновлён.")
+                return redirect("settings_profile")
+            else:
+                print("PROFILE FORM ERRORS:", form.errors)
+
+        elif is_upload_submit:
+            upload_form = TrackForm(request.POST, request.FILES)
+            if upload_form.is_valid():
+                t = upload_form.save(commit=False)
+                t.owner = request.user
+                t.save()
+                messages.success(request, "Трек загружен.")
+                return redirect("settings_profile")
+            else:
+                print("UPLOAD FORM ERRORS:", upload_form.errors)
 
     return render(request, "users/settings_profile.html", {
         "form": form,
         "upload_form": upload_form,
     })
-
 
 @login_required
 def deactivate_sessions(request):
