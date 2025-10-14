@@ -3,7 +3,10 @@
 }
 
 neptone.ru, www.neptone.ru {
-    reverse_proxy nginx:80
+    reverse_proxy nginx:80 {
+    	header_up X-Forwarded-Proto {scheme}
+	header_up Host {host}
+    }
     encode gzip
 }
 
