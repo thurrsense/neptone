@@ -99,13 +99,8 @@ def twofactor_verify(request):
 
 @csrf_protect
 def social_twofactor_verify(request):
-    # 1) пытаемся взять из GET/POST
-    partial_token = request.GET.get('partial_token') or request.POST.get('partial_token')
-    # 2) если нет — из сессии (то, что положили в save_status_to_session)
-    if not partial_token:
-        pp = request.session.get('partial_pipeline') or {}
-        partial_token = pp.get('token') or request.session.get('partial_token')
-
+    # token берём из POST (когда форма сабмитится) или из сессии
+    partial_token = request.POST.get('partial_token') or request.session.get('partial_token')
     if not partial_token:
         return HttpResponseBadRequest("Missing partial_token")
 
@@ -121,17 +116,21 @@ def social_twofactor_verify(request):
         token = (request.POST.get('token') or "").strip()
         device = user.get_totp_device()
         if device and device.verify_token(token):
+            # помечаем как пройдено — пайплайн продолжится
             request.session['social_2fa_ok'] = True
+
             # подчистим мусор
             request.session.pop('partial_token', None)
-            # продолжаем пайплайн ровно тем образом, как ожидает social-auth
+
+            # Возобновляем пайплайн
             complete_url = reverse("social:complete", args=[backend])
             return redirect(f"{complete_url}?partial_token={partial_token}")
         else:
             messages.error(request, "Неверный код 2FA")
 
+    # GET — показать форму (передадим hidden c partial_token из сессии)
     return render(request, "users/social_twofactor_verify.html", {
-        "partial_token": partial_token,  # пусть остаётся hidden — не помешает
+        "partial_token": partial_token,
         "backend": backend,
         "user_obj": user,
     })
