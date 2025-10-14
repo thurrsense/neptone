@@ -17,15 +17,20 @@ def require_2fa(strategy, backend, user=None, *args, **kwargs):
 
     # Если уже прошли 2FA — чистим флаги и пропускаем дальше
     if strategy.session_get('social_2fa_ok'):
-        strategy.session_pop('social_2fa_ok')
+        strategy.session_pop('social_2fa_ok', None)
         strategy.session_pop('pre_2fa_user_id', None)
         strategy.session_pop('partial_backend', None)
+        strategy.session_pop('partial_token', None)
         return
-
-    # Ещё не проходили — ставим паузу и отправляем на ввод OTP
+    
     strategy.session_set('pre_2fa_user_id', user.pk)
     strategy.session_set('partial_backend', backend.name)
-    return redirect(reverse('social_twofactor_verify'))
+
+    partial_token = strategy.session_get('partial_token')
+    url = reverse('social_twofactor_verify')
+    if partial_token:
+        url = f"{url}?partial_token={partial_token}"
+    return redirect(url)
 
 
 def save_status_to_session(strategy, pipeline_index=None, current_partial=None, *args, **kwargs):
