@@ -17,9 +17,12 @@ from .views import (
     deactivate_sessions, delete_account, delete_my_track, follow_toggle,
 )
 
+from .views import social_twofactor_verify
+
 urlpatterns = [
     path("login/", TwoFactorLoginView.as_view(), name="login"),  # <-- наш LoginView
     path("login/verify/", twofactor_verify, name="twofactor_verify"),  # страница ввода OTP после пароля
+    path("login/verify/social/", social_twofactor_verify, name="social_twofactor_verify"),
     path("logout/", LogoutView.as_view(next_page="home"), name="logout"),
     path("register/", register, name="register"),
 
