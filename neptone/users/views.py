@@ -13,15 +13,15 @@ from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
 from rest_framework.permissions import IsAuthenticated
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from .serializers import TOTPSetupSerializer, TOTPVerifySerializer, TOTPLoginSerializer
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .forms import RegistrationForm, ProfileForm
-from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import get_user_model
 from tracks.models import Track
 from tracks.forms import TrackForm
 from django.core.paginator import Paginator
 from django.contrib import messages
+from django.http import HttpResponseBadRequest
 from django.contrib.sessions.models import Session
 from django.views import View
 from django.views.decorators.csrf import csrf_protect
@@ -30,7 +30,6 @@ from django.contrib.auth import authenticate, login as auth_login
 from django.urls import reverse
 from django.http import HttpResponseRedirect
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.conf import settings
 
@@ -100,31 +99,40 @@ def twofactor_verify(request):
 
 @csrf_protect
 def social_twofactor_verify(request):
+    """
+    Страница ввода OTP для соц-логина (Google/Yandex).
+    Получает partial_token, проверяет 2FA и возобновляет pipeline.
+    """
+    # 1) Забираем partial_token и из GET, и из POST (важно для submit)
+    partial_token = request.GET.get('partial_token') or request.POST.get('partial_token')
+    if not partial_token:
+        return HttpResponseBadRequest("Missing partial_token")
+
     user_id = request.session.get('pre_2fa_user_id')
     backend = request.session.get('partial_backend')
-
-    if not user_id or not backend:
-        # Нечего проверять — отправим на обычную страницу логина
+    if not (user_id and backend):
+        messages.error(request, "2FA-сессия истекла. Попробуйте ещё раз.")
         return redirect("login")
 
     user = get_object_or_404(User, pk=user_id)
 
     if request.method == "POST":
-        form = OTPForm(request.POST)
-        if form.is_valid():
-            token = form.cleaned_data['token']
-            device = user.get_totp_device()
-            if device and device.verify_token(token):
-                # отмечаем, что 2FA пройдена для соцпайплайна
-                request.session['social_2fa_ok'] = True
-                # Возобновляем social-auth pipeline:
-                return redirect('social:complete', backend=backend)
-            else:
-                form.add_error("token", "Неверный токен 2FA")
-    else:
-        form = OTPForm()
+        token = (request.POST.get('token') or "").strip()
+        device = user.get_totp_device()
+        if device and device.verify_token(token):
+            # помечаем как пройдено — пайплайн продолжится
+            request.session['social_2fa_ok'] = True
+            complete_url = reverse("social:complete", args=[backend])
+            return redirect(f"{complete_url}?partial_token={partial_token}")
+        else:
+            messages.error(request, "Неверный код 2FA")
 
-    return render(request, "users/twofactor_verify.html", {"form": form, "user": user})
+    # GET — показать форму (и передать partial_token в hidden)
+    return render(request, "users/social_twofactor_verify.html", {
+        "partial_token": partial_token,
+        "backend": backend,
+        "user_obj": user,
+    })
 
 
 # --- settings: страница настройки 2FA (генерация QR + ввод токена для подтверждения) ---
