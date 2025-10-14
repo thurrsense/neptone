@@ -18,6 +18,17 @@
         </div>
 
         <div class="mb-2">
+          <label class="form-label">Логин (нельзя изменить)</label>
+        
+          <div class="form-control-plaintext border rounded px-3 py-2 bg-light text-dark">
+            {{ request.user.username }}
+          </div>
+        
+          <input type="hidden" name="username" value="{{ request.user.username }}">
+          <div class="form-text">Логин используется только для входа и ссылок, изменить нельзя.</div>
+        </div>
+
+        <div class="mb-2">
           <label class="form-label">Email</label>
           {{ form.email|add_class:"input-np" }} <div class="text-danger small">{{ form.email.errors }}</div>
         </div>

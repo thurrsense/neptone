@@ -48,7 +48,7 @@ class ProfileForm(UserChangeForm):
 
     class Meta:
         model = User
-        fields = ["display_name", "email", "bio", "birth_date",
+        fields = ["display_name", "username", "email", "bio", "birth_date",
                   "first_name", "last_name", "avatar"]
 
     def __init__(self, *args, **kwargs):
@@ -60,6 +60,14 @@ class ProfileForm(UserChangeForm):
         self.fields["avatar"].widget.attrs["class"] = "form-control"
         # дата
         self.fields["birth_date"].widget.attrs.update({"type": "date"})
+
+        self.fields["username"].disabled = True         # не отправится в POST
+        self.fields["username"].required = False        # чтобы валидация не требовала его из POST
+        self.fields["username"].widget.attrs["readonly"] = "readonly"  # защита от автозаполнений браузера
+
+    def clean_username(self):
+        # на случай ручного подлога запроса — всегда возвращаем исходный логин
+        return self.instance.username
 
     def clean_avatar(self):
         f = self.cleaned_data.get("avatar")

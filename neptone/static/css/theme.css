@@ -53,3 +53,11 @@ a:hover{color:var(--primary-200);text-decoration:underline}
 }
 body{padding-top:72px}
 input::placeholder{color:var(--text-muted)}
+
+.input-np[disabled],
+.input-np[readonly] {
+  background:#212529 !important;
+  color:#f8f9fa !important;
+  opacity: 1 !important;           /* убрать полупрозрачность */
+  cursor: not-allowed;             /* курсор “нельзя редактировать” */
+}
