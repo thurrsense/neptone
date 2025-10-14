@@ -6,14 +6,13 @@ from urllib.parse import urlencode
 
 def require_2fa(strategy, backend, user=None, *args, **kwargs):
     """
-    Если у пользователя включена 2FA — вручную создаём partial-проход,
-    сохраняем его token в сессию и уводим на страницу ввода OTP.
+    Если у пользователя включена 2FA — ручной partial без @partial.
+    ВАЖНО: не передавать **kwargs в partial_save, чтобы не утащить backend как строку.
     """
-    # если юзера ещё нет или 2FA выключена — просто продолжаем пайплайн
     if not user or not getattr(user, 'otp_enabled', False):
         return
 
-    # уже прошёл OTP — чистим флаги и продолжаем
+    # Уже прошли 2FA ранее — подчистить флаги и продолжить пайплайн
     if strategy.session_get('social_2fa_ok'):
         strategy.session_pop('social_2fa_ok', None)
         strategy.session_pop('pre_2fa_user_id', None)
@@ -21,16 +20,19 @@ def require_2fa(strategy, backend, user=None, *args, **kwargs):
         strategy.session_pop('partial_token', None)
         return
 
-    # создаём partial и получаем token
-    # partial_save вернёт объект с полем .token
-    partial = strategy.partial_save(backend, 'require_2fa', *args, **kwargs)
+    # На каком шаге сейчас? Возобновлять нужно со следующего шага
+    current_index = kwargs.get('pipeline_index', 0)
+    next_index = current_index + 1
+
+    # ВАЖНО: не передавать *args/**kwargs, чтобы 'backend' из kwargs не сохранился!
+    partial = strategy.partial_save(backend, next_index)
+
+    # Положим, что нам нужно для страницы 2FA
     strategy.session_set('partial_token', partial.token)
     strategy.session_set('pre_2fa_user_id', user.pk)
     strategy.session_set('partial_backend', backend.name)
 
-    # редиректим на нашу форму 2FA
-    url = reverse('social_twofactor_verify')
-    return strategy.redirect(url)
+    return strategy.redirect(reverse('social_twofactor_verify'))
 
 
 def save_status_to_session(strategy, pipeline_index=None, *args, **kwargs):
