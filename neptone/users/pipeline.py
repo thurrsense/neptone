@@ -1,6 +1,7 @@
 from django.shortcuts import redirect
 from django.urls import reverse
 from social_core.pipeline.partial import partial
+from urllib.parse import urlencode
 
 @partial
 def require_2fa(strategy, backend, user=None, *args, **kwargs):
@@ -25,3 +26,13 @@ def require_2fa(strategy, backend, user=None, *args, **kwargs):
     strategy.session_set('pre_2fa_user_id', user.pk)
     strategy.session_set('partial_backend', backend.name)
     return redirect(reverse('social_twofactor_verify'))
+
+
+def save_status_to_session(strategy, pipeline_index=None, current_partial=None, *args, **kwargs):
+    """
+    Минимальный аналог social_core.pipeline.partial.save_status_to_session
+    Сохраняет partial в сессию и ничего не рендерит.
+    """
+    if current_partial:  # объект PartialPipeline
+        # токен нужен, чтобы потом возобновить пайплайн
+        strategy.session_set('partial_token', current_partial.token)
