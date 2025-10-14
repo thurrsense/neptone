@@ -96,6 +96,9 @@ SOCIAL_AUTH_PIPELINE = (
     'social_core.pipeline.social_auth.social_uid',
     'social_core.pipeline.social_auth.auth_allowed',
     'social_core.pipeline.social_auth.social_user',
+
+    'users.pipeline.require_2fa',
+    
     'social_core.pipeline.user.get_username',
     'social_core.pipeline.user.create_user',
     'social_core.pipeline.social_auth.associate_user',
@@ -190,7 +193,6 @@ MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-SOCIAL_AUTH_REDIRECT_IS_HTTPS = True
 
 # Auth redirects
 LOGIN_URL = "login"          # куда @login_required шлёт неавторизованных
@@ -207,8 +209,9 @@ SOCIAL_AUTH_YANDEX_OAUTH2_SECRET = os.getenv("YANDEX_CLIENT_SECRET")
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+SOCIAL_AUTH_REDIRECT_IS_HTTPS = False
 
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",

@@ -32,7 +32,8 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.conf import settings
-
+from django.views.decorators.csrf import csrf_protect
+from django.utils.http import urlencode
 
 # --- Форма для ввода OTP (session flow) ---
 class OTPForm(forms.Form):
@@ -96,6 +97,51 @@ def twofactor_verify(request):
 
     return render(request, "users/twofactor_verify.html", {"form": form, "user": user})
 
+
+@csrf_protect
+def twofactor_verify_oauth(request):
+    """
+    Ввод TOTP после возврата от OAuth-провайдера, до завершения pipeline.
+    Ожидает ?partial_token=... (social-core) и ?backend=...
+    """
+    partial_token = request.GET.get("partial_token") or request.POST.get("partial_token")
+    backend_name  = request.GET.get("backend") or request.POST.get("backend")
+    user_id = request.session.get("pre_2fa_user_id")
+
+    # --- Диагностика, ЧТО теряется
+    print("DBG twofactor_verify_oauth:",
+          "partial_token:", bool(partial_token),
+          "backend_name:", backend_name,
+          "session_user_id:", user_id)
+
+    if not (partial_token and backend_name and user_id):
+        # нет контекста — уводим на логин
+        return redirect("login")
+
+    user = get_object_or_404(User, pk=user_id)
+
+    if request.method == "POST":
+        form = OTPForm(request.POST)
+        if form.is_valid():
+            token = form.cleaned_data["token"]
+            device = user.get_totp_device()
+            if device and device.verify_token(token):
+                # Помечаем, что 2FA пройдена для текущего pipeline
+                request.session["verified_2fa"] = True
+                request.session.pop("pre_2fa_user_id", None)
+
+                # Возобновляем social pipeline: /oauth/complete/<backend>/?partial_token=...
+                complete_url = reverse("social:complete", args=(backend_name,))
+                query = urlencode({"partial_token": partial_token})
+                return redirect(f"{complete_url}?{query}")
+    else:
+        form = OTPForm()
+
+    return render(
+        request,
+        "users/twofactor_verify_oauth.html",
+        {"form": form, "user": user, "partial_token": partial_token, "backend": backend_name}
+    )
 
 # --- settings: страница настройки 2FA (генерация QR + ввод токена для подтверждения) ---
 @method_decorator(login_required, name='dispatch')
@@ -463,3 +509,4 @@ def follow_toggle(request, username):
         rel.delete()
         messages.info(request, f"Вы отписались от {target.username}")
     return redirect("artist_profile", username=username)
+
