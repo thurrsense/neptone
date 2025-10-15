@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'captcha',
-    'users',
+    'users.apps.UsersConfig',
     'djoser',
     'core',
     'django_otp',
@@ -86,6 +86,9 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django_otp.middleware.OTPMiddleware',
+
+    'users.middleware.OTPRequiredMiddleware',
+
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',
@@ -96,14 +99,8 @@ SOCIAL_AUTH_PIPELINE = (
     'social_core.pipeline.social_auth.social_uid',
     'social_core.pipeline.social_auth.auth_allowed',
     'social_core.pipeline.social_auth.social_user',
-
-    'users.pipeline.require_2fa',
-    
     'social_core.pipeline.user.get_username',
     'social_core.pipeline.user.create_user',
-
-    'users.pipeline.require_2fa',
-
     'social_core.pipeline.social_auth.associate_user',
     'social_core.pipeline.social_auth.load_extra_data',
     'social_core.pipeline.user.user_details',
@@ -214,15 +211,18 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 SOCIAL_AUTH_REDIRECT_IS_HTTPS = True
-
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
+
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_AGE = 1209600  # 2 недели
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+SOCIAL_AUTH_RAISE_EXCEPTIONS = True           
+SOCIAL_AUTH_LOGIN_ERROR_URL = '/users/oauth/error/' 
 
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True

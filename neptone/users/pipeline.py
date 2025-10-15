@@ -19,13 +19,11 @@ def require_2fa(strategy, backend=None, user=None, **kwargs):
     except Exception as e:
         print("DBG require_2fa logging error:", e)
 
-    # Если pipeline уже резюмится ПОСЛЕ нашeго partial (на всякий случай)
     if strategy.session_get("verified_2fa"):
-        # очистим флаги и пустим дальше по pipeline
         strategy.session_pop("verified_2fa")
         strategy.session_pop("pre_2fa_user_id")
         return
-
+    
     if not user:
         return  # новый/неассоциированный соц-пользователь
 

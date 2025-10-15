@@ -10,23 +10,25 @@ from .views import (
     TOTPSetupPageView, 
     TOTPDisableView,
     twofactor_verify,
-    twofactor_verify_oauth, 
+    otp_verify_gate, 
     TOTPSetupView, 
     TOTPVerifyView, 
     TOTPLoginView,
     register, settings_profile, artist_profile, my_profile_redirect,
     deactivate_sessions, delete_account, delete_my_track, follow_toggle,
 )
+from django.views.generic import TemplateView
 
 urlpatterns = [
     path("login/", TwoFactorLoginView.as_view(), name="login"),  # <-- наш LoginView
     path("login/verify/", twofactor_verify, name="twofactor_verify"),  # страница ввода OTP после пароля
-    path("login/oauth-verify/", twofactor_verify_oauth, name="twofactor_verify_oauth"),
+    path("login/otp/", otp_verify_gate, name="otp_verify_gate"),
+    
     path("logout/", LogoutView.as_view(next_page="home"), name="logout"),
     path("register/", register, name="register"),
 
     path('oauth/', include('social_django.urls', namespace='social')),
-
+    path("oauth/error/", TemplateView.as_view(template_name="users/oauth_error.html"), name="social_error"),
     # Мой профиль -> редирект на публичную страницу себя
     path("profile/", my_profile_redirect, name="my_profile"),
 
