@@ -97,28 +97,12 @@ def twofactor_verify(request):
 
     return render(request, "users/twofactor_verify.html", {"form": form, "user": user})
 
-
-@csrf_protect
-def twofactor_verify_oauth(request):
-    """
-    Ввод TOTP после возврата от OAuth-провайдера, до завершения pipeline.
-    Ожидает ?partial_token=... (social-core) и ?backend=...
-    """
-    partial_token = request.GET.get("partial_token") or request.POST.get("partial_token")
-    backend_name  = request.GET.get("backend") or request.POST.get("backend")
-    user_id = request.session.get("pre_2fa_user_id")
-
-    # --- Диагностика, ЧТО теряется
-    print("DBG twofactor_verify_oauth:",
-          "partial_token:", bool(partial_token),
-          "backend_name:", backend_name,
-          "session_user_id:", user_id)
-
-    if not (partial_token and backend_name and user_id):
-        # нет контекста — уводим на логин
-        return redirect("login")
-
-    user = get_object_or_404(User, pk=user_id)
+@login_required
+def otp_verify_gate(request):
+    user = request.user
+    if not getattr(user, "otp_enabled", False):
+        request.session["otp_ok"] = True
+        return redirect(settings.LOGIN_REDIRECT_URL)
 
     if request.method == "POST":
         form = OTPForm(request.POST)
@@ -126,22 +110,42 @@ def twofactor_verify_oauth(request):
             token = form.cleaned_data["token"]
             device = user.get_totp_device()
             if device and device.verify_token(token):
-                # Помечаем, что 2FA пройдена для текущего pipeline
-                request.session["verified_2fa"] = True
-                request.session.pop("pre_2fa_user_id", None)
-
-                # Возобновляем social pipeline: /oauth/complete/<backend>/?partial_token=...
-                complete_url = reverse("social:complete", args=(backend_name,))
-                query = urlencode({"partial_token": partial_token})
-                return redirect(f"{complete_url}?{query}")
+                request.session["otp_ok"] = True
+                next_url = request.session.pop("post_login_next", None) or settings.LOGIN_REDIRECT_URL
+                return redirect(next_url)
+            else:
+                form.add_error("token", "Неверный код 2FA")
     else:
         form = OTPForm()
 
-    return render(
-        request,
-        "users/twofactor_verify_oauth.html",
-        {"form": form, "user": user, "partial_token": partial_token, "backend": backend_name}
-    )
+    return render(request, "users/otp_verify_gate.html", {"form": form, "user": user})
+
+
+
+@csrf_protect
+def twofactor_verify(request):
+    user_id = request.session.get('pre_2fa_user_id')
+    if not user_id:
+        return redirect("login")
+    user = get_object_or_404(User, pk=user_id)
+
+    if request.method == "POST":
+        form = OTPForm(request.POST)
+        if form.is_valid():
+            token = form.cleaned_data['token']
+            device = user.get_totp_device()
+            if device and device.verify_token(token):
+                auth_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+                request.session.pop('pre_2fa_user_id', None)
+                # <<< ДОБАВЬТЕ СТРОКУ:
+                request.session["otp_ok"] = True
+                return redirect(settings.LOGIN_REDIRECT_URL)
+            else:
+                form.add_error("token", "Неверный токен 2FA")
+    else:
+        form = OTPForm()
+
+    return render(request, "users/twofactor_verify.html", {"form": form, "user": user})
 
 # --- settings: страница настройки 2FA (генерация QR + ввод токена для подтверждения) ---
 @method_decorator(login_required, name='dispatch')
